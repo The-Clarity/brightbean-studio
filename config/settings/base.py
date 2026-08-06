@@ -200,14 +200,15 @@ if STORAGE_BACKEND.lower() == "s3":
     AWS_ACCESS_KEY_ID = env("S3_ACCESS_KEY_ID", default="") or None
     AWS_SECRET_ACCESS_KEY = env("S3_SECRET_ACCESS_KEY", default="") or None
     AWS_STORAGE_BUCKET_NAME = env("S3_BUCKET_NAME", default="")
+    AWS_LOCATION = env("S3_LOCATION", default="")
     AWS_S3_CUSTOM_DOMAIN = env("S3_CUSTOM_DOMAIN", default="")
     AWS_S3_REGION_NAME = env("S3_REGION_NAME", default="auto")
     AWS_S3_FILE_OVERWRITE = False
     # Bucket-owner-enforced S3 rejects every ACL header. Access remains private
     # unless the bucket policy explicitly permits reads.
     AWS_DEFAULT_ACL = None
-    # Public social-media buckets need durable URLs: providers may fetch an
-    # asset long after a one-hour presigned URL would have expired.
+    # The private S3 bucket is served through a durable authenticated media
+    # gateway; providers may fetch an asset long after a presign would expire.
     AWS_QUERYSTRING_AUTH = env.bool("S3_QUERYSTRING_AUTH", default=True)
     AWS_QUERYSTRING_EXPIRE = 3600  # 1-hour expiry for presigned URLs
     AWS_S3_OBJECT_PARAMETERS = {
