@@ -1,4 +1,15 @@
-FROM python:3.12-slim AS base
+FROM node:22.20-bookworm-slim AS assets
+
+WORKDIR /build/theme/static_src
+
+COPY theme/static_src/package.json theme/static_src/package-lock.json ./
+RUN npm ci
+
+COPY theme/static_src/src ./src
+COPY theme/static_src/tailwind.config.js ./tailwind.config.js
+RUN npm run build
+
+FROM python:3.12-slim AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -7,21 +18,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq-dev gcc curl ffmpeg \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Node.js for Tailwind build
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get install -y nodejs \
+    libpq-dev gcc ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt requirements.lock ./
 RUN pip install --no-cache-dir --require-hashes -r requirements.lock
 
 COPY . .
-
-# Build Tailwind CSS
-RUN cd theme/static_src && npm ci && npm run build
+COPY --from=assets /build/theme/static/css/dist/styles.css theme/static/css/dist/styles.css
 
 # Collect static files
 RUN DJANGO_SETTINGS_MODULE=config.settings.production \
