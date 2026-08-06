@@ -81,7 +81,7 @@ jobs:
           sudo install -m 0755 trivy /usr/local/bin/trivy
 
       - name: Reject fixable critical image vulnerabilities
-        run: trivy image --exit-code 1 --severity CRITICAL --ignore-unfixed "${REGISTRY}/${IMAGE_NAME}@${{ steps.image.outputs.digest }}"
+        run: trivy image --platform "${{ matrix.platform }}" --exit-code 1 --severity CRITICAL --ignore-unfixed "${REGISTRY}/${IMAGE_NAME}@${{ steps.image.outputs.digest }}"
 
       - name: Export digest
         run: |
