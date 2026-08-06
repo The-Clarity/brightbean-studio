@@ -15,8 +15,8 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements.txt requirements.lock ./
+RUN pip install --no-cache-dir --require-hashes -r requirements.lock
 
 COPY . .
 
@@ -28,6 +28,12 @@ RUN DJANGO_SETTINGS_MODULE=config.settings.production \
     SECRET_KEY=build-placeholder \
     DATABASE_URL=sqlite:///tmp/build.db \
     python manage.py collectstatic --noinput
+
+RUN groupadd --system brightbean \
+    && useradd --system --gid brightbean --home-dir /app brightbean \
+    && chown -R brightbean:brightbean /app
+
+USER brightbean
 
 EXPOSE 8000
 
