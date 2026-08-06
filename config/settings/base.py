@@ -203,8 +203,12 @@ if STORAGE_BACKEND.lower() == "s3":
     AWS_S3_CUSTOM_DOMAIN = env("S3_CUSTOM_DOMAIN", default="")
     AWS_S3_REGION_NAME = env("S3_REGION_NAME", default="auto")
     AWS_S3_FILE_OVERWRITE = False
-    AWS_DEFAULT_ACL = "private"
-    AWS_QUERYSTRING_AUTH = True
+    # Bucket-owner-enforced S3 rejects every ACL header. Access remains private
+    # unless the bucket policy explicitly permits reads.
+    AWS_DEFAULT_ACL = None
+    # Public social-media buckets need durable URLs: providers may fetch an
+    # asset long after a one-hour presigned URL would have expired.
+    AWS_QUERYSTRING_AUTH = env.bool("S3_QUERYSTRING_AUTH", default=True)
     AWS_QUERYSTRING_EXPIRE = 3600  # 1-hour expiry for presigned URLs
     AWS_S3_OBJECT_PARAMETERS = {
         "CacheControl": "max-age=86400",
