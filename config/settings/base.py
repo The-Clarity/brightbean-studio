@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -142,6 +143,10 @@ else:
 DATABASES = {
     "default": env.db("DATABASE_URL", default="postgres://postgres:postgres@localhost:5432/brightbean"),
 }
+DB_SCHEMA = env("DB_SCHEMA", default="public")
+if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", DB_SCHEMA):
+    raise ValueError("DB_SCHEMA must be a valid PostgreSQL identifier")
+DATABASES["default"]["OPTIONS"] = {"options": f"-c search_path={DB_SCHEMA}"}
 
 # Custom user model
 AUTH_USER_MODEL = "accounts.User"
