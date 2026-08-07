@@ -12,11 +12,14 @@ permissions:
 
 concurrency:
   group: clarity-production-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: the-clarity/brightbean-studio
+  AWS_REGION: us-east-1
+  AWS_ROLE_ARN: arn:aws:iam::330368327370:role/clarity-brightbean-image-publisher
+  ECR_REGISTRY: 330368327370.dkr.ecr.us-east-1.amazonaws.com
+  INTAKE_IMAGE: 330368327370.dkr.ecr.us-east-1.amazonaws.com/clarity-intake-brightbean
+  RUNTIME_REPOSITORY: clarity-3p-brightbean
   TRIVY_VERSION: 0.72.0
 
 jobs:
@@ -36,7 +39,7 @@ jobs:
             trivy-arch: ARM64
     permissions:
       contents: read
-      packages: write
+      id-token: write
     steps:
       - name: Prepare platform slug
         run: echo "PLATFORM_PAIR=${platform//\//-}" >> "$GITHUB_ENV"
@@ -51,28 +54,33 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
 
-      - name: Log in to GHCR
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+      - name: Configure private AWS image intake
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
         with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          role-session-name: brightbean-build-${{ github.run_id }}
+          allowed-account-ids: "330368327370"
 
-      - name: Build and push by digest
+      - name: Log in to private ECR
+        run: aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+
+      - name: Build and push isolated platform subject
         id: image
         uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
         with:
           context: .
           file: Dockerfile
           platforms: ${{ matrix.platform }}
+          tags: ${{ env.INTAKE_IMAGE }}:build-${{ github.sha }}-${{ env.PLATFORM_PAIR }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
           cache-from: type=gha,scope=${{ env.PLATFORM_PAIR }}
           cache-to: type=gha,mode=max,scope=${{ env.PLATFORM_PAIR }}
-          provenance: mode=max
-          sbom: true
-          outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
+          provenance: false
+          sbom: false
+          push: true
 
       - name: Install verified Trivy binary
         run: |
@@ -84,54 +92,64 @@ jobs:
           sudo install -m 0755 trivy /usr/local/bin/trivy
 
       - name: Reject fixable critical image vulnerabilities
-        run: trivy image --platform "${{ matrix.platform }}" --exit-code 1 --severity CRITICAL --ignore-unfixed "${REGISTRY}/${IMAGE_NAME}@${{ steps.image.outputs.digest }}"
-
-      - name: Export digest
-        run: |
-          mkdir -p "${{ runner.temp }}/digests"
-          digest="${{ steps.image.outputs.digest }}"
-          touch "${{ runner.temp }}/digests/${digest#sha256:}"
-
-      - name: Upload digest
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: digests-${{ env.PLATFORM_PAIR }}
-          path: ${{ runner.temp }}/digests/*
-          if-no-files-found: error
-          retention-days: 1
+        run: trivy image --platform "${{ matrix.platform }}" --exit-code 1 --severity CRITICAL --ignore-unfixed "${INTAKE_IMAGE}@${{ steps.image.outputs.digest }}"
 
   publish:
     name: Publish verified manifest
     needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 55
     permissions:
       contents: read
-      packages: write
+      id-token: write
     steps:
-      - name: Download digests
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      - name: Configure private AWS image intake
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
         with:
-          path: ${{ runner.temp }}/digests
-          pattern: digests-*
-          merge-multiple: true
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          role-session-name: brightbean-publish-${{ github.run_id }}
+          role-duration-seconds: 3600
+          allowed-account-ids: "330368327370"
+
+      - name: Log in to private ECR
+        run: aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
 
-      - name: Log in to GHCR
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Publish immutable CalVer and latest
-        working-directory: ${{ runner.temp }}/digests
+      - name: Publish verified private intake manifest
         run: |
           version="$(date -u +%Y.%-m.%-d).${GITHUB_RUN_NUMBER}"
           docker buildx imagetools create \
-            -t "${REGISTRY}/${IMAGE_NAME}:${version}" \
-            -t "${REGISTRY}/${IMAGE_NAME}:latest" \
-            $(printf "${REGISTRY}/${IMAGE_NAME}@sha256:%s " *)
-          docker buildx imagetools inspect "${REGISTRY}/${IMAGE_NAME}:${version}"
+            -t "${INTAKE_IMAGE}:${version}" \
+            -t "${INTAKE_IMAGE}:sha-${GITHUB_SHA}" \
+            -t "${INTAKE_IMAGE}:latest" \
+            "${INTAKE_IMAGE}:build-${GITHUB_SHA}-linux-amd64" \
+            "${INTAKE_IMAGE}:build-${GITHUB_SHA}-linux-arm64"
+          docker buildx imagetools inspect "${INTAKE_IMAGE}:sha-${GITHUB_SHA}"
+
+      - name: Patch, sign, and verify the runtime image
+        run: |
+          payload="$(jq -cn \
+            --arg trigger "${GITHUB_REPOSITORY}:${GITHUB_RUN_ID}:${GITHUB_RUN_ATTEMPT}:${GITHUB_SHA}" \
+            --arg repo "$RUNTIME_REPOSITORY" \
+            '{triggerId:$trigger,overrides:{MIRROR_REFRESH:"true",MIRROR_REPOS_OVERRIDE:$repo,COPA_REPOS_OVERRIDE:$repo}}')"
+          function_error="$(aws lambda invoke \
+            --function-name clarity-copa-build-debounce \
+            --cli-binary-format raw-in-base64-out \
+            --payload "$payload" \
+            --query FunctionError \
+            --output text \
+            /tmp/copa-response.json)"
+          test "$function_error" = "None"
+          execution_arn="$(jq -er '.executionArn' /tmp/copa-response.json)"
+          status="$(jq -er '.status' /tmp/copa-response.json)"
+          while test "$status" = "RUNNING"; do
+            sleep 30
+            status="$(aws stepfunctions describe-execution \
+              --execution-arn "$execution_arn" \
+              --query status \
+              --output text)"
+          done
+          test "$status" = "SUCCEEDED"
