@@ -14,7 +14,6 @@ _KEY_HINTS = {
     "tiktok": "client_key, client_secret  (note: client_key, NOT client_id)",
     "youtube": "client_id, client_secret",
     "google_business": "client_id, client_secret (optional: account_id, location_id)",
-    "linkedin_personal": "client_id, client_secret (optional: _oauth_mode = oidc | community_management)",
     "linkedin_company": "client_id, client_secret",
 }
 

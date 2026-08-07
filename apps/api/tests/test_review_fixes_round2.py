@@ -81,7 +81,7 @@ def social_account(db, workspace):
 
     return SocialAccount.objects.create(
         workspace=workspace,
-        platform="linkedin_personal",
+        platform="facebook",
         account_platform_id="li-r2",
         account_name="LinkedIn R2",
         connection_status=SocialAccount.ConnectionStatus.CONNECTED,
@@ -593,7 +593,7 @@ def second_account(db, workspace):
 
     return SocialAccount.objects.create(
         workspace=workspace,
-        platform="linkedin_personal",
+        platform="facebook",
         account_platform_id="li-r2-second",
         account_name="Second LinkedIn R2",
         connection_status=SocialAccount.ConnectionStatus.CONNECTED,

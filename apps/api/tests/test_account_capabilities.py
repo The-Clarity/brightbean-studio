@@ -6,10 +6,8 @@ whether a first_comment will actually be posted. The fields come from
 ``SocialAccount.char_limit``, ``SocialAccount.field_config``, and
 ``SocialAccount.supports_first_comment()`` respectively.
 
-LinkedIn Personal is the runtime-conditional case: in OIDC mode the
-socialActions.CREATE endpoint isn't available, so the publisher silently
-drops the first_comment. The API has to reflect that — otherwise an
-agent will write copy assuming a reply will land and be wrong.
+Historical LinkedIn Personal rows are retained only for data migration and
+must never appear on REST or MCP account surfaces.
 """
 
 from __future__ import annotations
@@ -109,7 +107,7 @@ class TestPerPlatformCapabilities:
             _make_account(workspace, "tiktok", account_platform_id="tk-1"),
             _make_account(workspace, "bluesky", account_platform_id="bs-1"),
             _make_account(workspace, "google_business", account_platform_id="gb-1"),
-            _make_account(workspace, "linkedin_company", account_platform_id="li-co-1"),
+            _make_account(workspace, "linkedin_company", account_platform_id="112378013"),
             _make_account(workspace, "facebook", account_platform_id="fb-1"),
         ]
         return _issued_key(workspace, user, accounts)
@@ -182,52 +180,51 @@ class TestPerPlatformCapabilities:
 
 
 # ---------------------------------------------------------------------------
-# LinkedIn Personal: runtime credential resolution
+# Historical LinkedIn Personal quarantine
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.django_db
-class TestLinkedInPersonalOidcGate:
-    """``supports_first_comment()`` resolves credentials at runtime for
-    linkedin_personal and inspects ``_oauth_mode``:
-
-      * ``oidc`` → returns False (Community Management API not approved
-        for this org, so the publisher will drop the first comment)
-      * any other value → returns True
-
-    Both branches are tested via monkeypatch so the result doesn't depend
-    on which env vars the developer has populated locally.
-    """
+class TestHistoricalLinkedInPersonalQuarantine:
+    """A legacy allowlist relation cannot reactivate a personal identity."""
 
     @pytest.fixture
-    def linkedin_personal_key(self, user, owner_memberships, workspace):
-        acc = _make_account(workspace, "linkedin_personal", account_platform_id="li-personal-1")
-        return _issued_key(workspace, user, [acc])
+    def key_with_historical_relation(self, user, owner_memberships, workspace):
+        from apps.social_accounts.models import SocialAccount
+
+        active = _make_account(workspace, "facebook", account_platform_id="fb-active-1")
+        historical = SocialAccount.all_objects.create(
+            workspace=workspace,
+            platform="linkedin_personal",
+            account_platform_id="human-page-admin",
+            account_name="Historical Human",
+        )
+        key = _issued_key(workspace, user, [active])
+        # Simulate a relation created before personal LinkedIn was retired.
+        key.api_key.social_accounts.add(historical)
+        return key
 
     @pytest.fixture
-    def client(self, linkedin_personal_key):
-        return _SecureClient(HTTP_AUTHORIZATION=f"Bearer {linkedin_personal_key.plaintext_token}")
+    def client(self, key_with_historical_relation):
+        return _SecureClient(HTTP_AUTHORIZATION=f"Bearer {key_with_historical_relation.plaintext_token}")
 
-    def test_oidc_mode_reports_supports_first_comment_false(self, monkeypatch, client):
-        from apps.publisher import engine
+    def test_rest_and_mcp_never_return_historical_personal_identity(self, client):
+        me_accounts = client.get("/api/v1/me/").json()["allowlisted_accounts"]
+        listed_accounts = client.get("/api/v1/accounts/").json()["accounts"]
+        response = client.post(
+            "/api/v1/mcp/",
+            data=json.dumps(
+                {
+                    "jsonrpc": "2.0",
+                    "method": "tools/call",
+                    "params": {"name": "list_accounts", "arguments": {}},
+                    "id": 1,
+                }
+            ),
+            content_type="application/json",
+        ).json()
+        mcp_accounts = json.loads(response["result"]["content"][0]["text"])["accounts"]
 
-        monkeypatch.setattr(
-            engine,
-            "_resolve_publish_credentials",
-            lambda account: {"_oauth_mode": "oidc"},
-        )
-        body = client.get("/api/v1/me/").json()
-        acc = next(a for a in body["allowlisted_accounts"] if a["platform"] == "linkedin_personal")
-        assert acc["supports_first_comment"] is False
-
-    def test_community_management_mode_reports_supports_first_comment_true(self, monkeypatch, client):
-        from apps.publisher import engine
-
-        monkeypatch.setattr(
-            engine,
-            "_resolve_publish_credentials",
-            lambda account: {"_oauth_mode": "community_management", "access_token": "stub"},
-        )
-        body = client.get("/api/v1/me/").json()
-        acc = next(a for a in body["allowlisted_accounts"] if a["platform"] == "linkedin_personal")
-        assert acc["supports_first_comment"] is True
+        for accounts in (me_accounts, listed_accounts, mcp_accounts):
+            assert {account["platform"] for account in accounts} == {"facebook"}
+            assert "human-page-admin" not in repr(accounts)

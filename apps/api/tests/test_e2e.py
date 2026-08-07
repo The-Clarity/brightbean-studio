@@ -98,7 +98,7 @@ def social_account(db, workspace):
 
     return SocialAccount.objects.create(
         workspace=workspace,
-        platform="linkedin_personal",
+        platform="facebook",
         account_platform_id="li-e2e",
         account_name="LinkedIn E2E",
         connection_status=SocialAccount.ConnectionStatus.CONNECTED,
@@ -274,9 +274,12 @@ class TestRateLimitResponseHeaders:
     """
 
     def test_platform_quota_429_has_retry_after_and_tier(self, client_with_token, social_account):
-        # Fill the LinkedIn 100-post/day bucket with scheduled rows so
+        from apps.api.limits import resolve_platform_limit
+
+        # Fill the active platform's full daily bucket with scheduled rows so
         # the next ``check_platform_quota`` immediately 429s.
-        for _ in range(100):
+        limit = resolve_platform_limit(social_account)
+        for _ in range(limit):
             PlatformPost.objects.create(
                 post=Post.objects.create(workspace=social_account.workspace, caption="x"),
                 social_account=social_account,
@@ -302,8 +305,8 @@ class TestRateLimitResponseHeaders:
         # Wire-shape: ``tier`` identifies which throttle fired,
         # ``retry_after`` is seconds to wait. Agents key off both.
         assert body["error"] == "rate_limited"
-        assert body["tier"] == "platform_quota:linkedin_personal"
-        assert body["limit"] == 100
+        assert body["tier"] == "platform_quota:facebook"
+        assert body["limit"] == limit
         assert "retry_after" in body
         # And the matching HTTP header per RFC 6585.
         assert "Retry-After" in r.headers

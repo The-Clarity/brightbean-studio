@@ -166,9 +166,13 @@ def issue_api_key(
     sa_list = list(social_accounts)
     if not sa_list:
         raise ValueError("An API key must allowlist at least one connected account.")
+    from apps.social_accounts.identity_policy import linkedin_publish_block_reason
+
     for sa in sa_list:
         if sa.workspace_id != workspace.id:
             raise ValueError(f"SocialAccount {sa.id} does not belong to workspace {workspace.id}.")
+        if reason := linkedin_publish_block_reason(sa.platform, sa.account_platform_id):
+            raise ValueError(f"SocialAccount {sa.id} is not an operable Clarity identity: {reason}")
 
     # Org-level manage_api_keys gate — must be checked before any
     # workspace-permission logic so a non-admin who happens to have rich
@@ -269,9 +273,13 @@ def update_api_key(api_key: ApiKey, *, editor, permissions: list[str], social_ac
     sa_list = list(social_accounts)
     if not sa_list:
         raise ValueError("An API key must allowlist at least one connected account.")
+    from apps.social_accounts.identity_policy import linkedin_publish_block_reason
+
     for sa in sa_list:
         if sa.workspace_id != workspace.id:
             raise ValueError(f"SocialAccount {sa.id} does not belong to workspace {workspace.id}.")
+        if reason := linkedin_publish_block_reason(sa.platform, sa.account_platform_id):
+            raise ValueError(f"SocialAccount {sa.id} is not an operable Clarity identity: {reason}")
 
     # Permissions: flip only within the editor's grantable set; preserve the rest.
     editor_grantable = {k for k, v in membership.effective_permissions.items() if v and k in PERMISSION_KEYS}

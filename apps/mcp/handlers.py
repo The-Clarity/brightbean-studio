@@ -1028,7 +1028,7 @@ register_tool(
             "where ``delta`` is the percent change vs. the prior equal-length window and "
             "``series`` is the daily sparkline. Includes ``captured_at`` and ``next_sync_eta`` "
             "so an agent can pick a sensible poll delay. Platforms without an analytics surface "
-            "(LinkedIn Personal, Bluesky, Mastodon) return ``analytics_available: false`` with "
+            "(Bluesky and Mastodon) return ``analytics_available: false`` with "
             "``unavailable_reason``. Requires the view_analytics permission."
         ),
         input_schema={
@@ -1086,7 +1086,7 @@ register_tool(
             "platform reports, plus ``captured_at`` and ``next_sync_eta`` for polling. Drafts "
             "and scheduled posts return an empty ``metric_tiles`` array (not an error), so this "
             "tool is safe to call in a polling loop right after ``schedule_post``. Platforms "
-            "without analytics (LinkedIn Personal, Bluesky, Mastodon) carry "
+            "without analytics (Bluesky and Mastodon) carry "
             "``analytics_available: false`` per child. Requires the view_analytics permission."
         ),
         input_schema={

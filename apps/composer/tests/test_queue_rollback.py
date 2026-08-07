@@ -29,7 +29,7 @@ class AddToQueueRollbackTest(TestCase):
         # Account A has posting slots; account B has none, so its queue is always full.
         self.acct_a = SocialAccount.objects.create(
             workspace=self.workspace,
-            platform="linkedin_personal",
+            platform="facebook",
             account_platform_id="li-a",
             account_name="A",
             connection_status=SocialAccount.ConnectionStatus.CONNECTED,

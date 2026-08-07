@@ -58,10 +58,11 @@ class IdeaMediaFlowsTests(TestCase):
         return reverse("composer:idea_create_post", kwargs={"workspace_id": self.workspace.id, "idea_id": idea_id})
 
     def _create_social_account(self, platform, suffix, status=SocialAccount.ConnectionStatus.CONNECTED):
+        platform_id = "112378013" if platform == "linkedin_company" else f"{platform}-{suffix}"
         return SocialAccount.objects.create(
             workspace=self.workspace,
             platform=platform,
-            account_platform_id=f"{platform}-{suffix}",
+            account_platform_id=platform_id,
             account_name=f"{platform}-{suffix}",
             connection_status=status,
         )

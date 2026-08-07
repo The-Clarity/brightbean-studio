@@ -68,8 +68,7 @@ A free hosted version is available at [brightbean.xyz/studio](https://brightbean
 | <img src="https://cdn.simpleicons.org/facebook" width="16" height="16"> Facebook | ✓ | ✓ | ✓ | ✓ |
 | <img src="https://cdn.simpleicons.org/instagram" width="16" height="16"> Instagram | ✓ | ✓ | ✓ | ✓ |
 | <img src="https://cdn.simpleicons.org/instagram" width="16" height="16"> Instagram (Direct) | ✓ | ✓ | ✓ | ✓ |
-| <img src="https://api.iconify.design/logos/linkedin-icon.svg" width="16" height="16"> LinkedIn (Personal) | ✓ | ✓ | — | ✓ |
-| <img src="https://api.iconify.design/logos/linkedin-icon.svg" width="16" height="16"> LinkedIn (Company) | ✓ | ✓ | — | ✓ |
+| <img src="https://api.iconify.design/logos/linkedin-icon.svg" width="16" height="16"> LinkedIn (Clarity Page) | ✓ | ✓ | — | ✓ |
 | <img src="https://cdn.simpleicons.org/tiktok" width="16" height="16"> TikTok | ✓ | — | — | ✓ |
 | <img src="https://cdn.simpleicons.org/youtube" width="16" height="16"> YouTube | ✓ | ✓ | — | ✓ |
 | <img src="https://cdn.simpleicons.org/pinterest" width="16" height="16"> Pinterest | ✓ | — | — | ✓ |
@@ -441,52 +440,28 @@ The Instagram (Direct) connector uses the **Instagram API with Instagram Login**
 
 ### LinkedIn
 
-Brightbean Studio supports two LinkedIn paths. Pick whichever your LinkedIn dev app can obtain - or both, on separate apps.
-
-**Path A - Personal-only (any individual developer can do this):**
-
-1. Go to the [LinkedIn Developer Portal](https://developer.linkedin.com/) and create a new app (no Company Page verification required).
-2. Under **Products**, request access to (both auto-approved):
-   - **Sign In with LinkedIn using OpenID Connect**
-   - **Share on LinkedIn**
-3. Under **Auth**, add the redirect URI:
-   ```
-   {APP_URL}/social-accounts/callback/linkedin_personal/
-   ```
-4. Scopes: `openid`, `profile`, `email`, `w_member_social`.
-5. Set the environment variables:
-   ```
-   PLATFORM_LINKEDIN_PERSONAL_CLIENT_ID=your-client-id
-   PLATFORM_LINKEDIN_PERSONAL_CLIENT_SECRET=your-client-secret
-   ```
-
-> **Limitations of Path A:** access tokens last ~60 days and LinkedIn does not issue refresh tokens for these scopes - users must manually reconnect every ~60 days. Inbox / comment-reading is not available for personal accounts on this path.
-
-**Path B - Company Pages (also enables full Personal features):**
+The Clarity fork supports one LinkedIn identity: Company Page
+`urn:li:organization:112378013`. Personal-profile connection, identity,
+publishing, analytics, and credentials are unavailable. The human Page
+administrator grants OAuth consent but their member profile is never fetched,
+stored, logged, or returned.
 
 1. Go to the [LinkedIn Developer Portal](https://developer.linkedin.com/) and create a new app.
-2. Verify the app's association with a LinkedIn Company Page.
+2. Verify the app's association with the Clarity Company Page.
 3. Under **Products**, request access to:
    - **Community Management API** *(restricted - requires LinkedIn review)*
-4. Under **Auth**, add **both** redirect URIs:
+4. Under **Auth**, add the Company Page redirect URI:
    ```
-   {APP_URL}/social-accounts/callback/linkedin_personal/
    {APP_URL}/social-accounts/callback/linkedin_company/
    ```
-5. Scopes:
-   - **Personal:** `r_basicprofile`, `w_member_social`, `r_member_social`
-   - **Company:** `r_basicprofile`, `w_member_social`, `w_organization_social`, `r_organization_social`, `rw_organization_admin`
+5. Request exactly `rw_organization_admin`, `w_organization_social`, and
+   `r_organization_social`.
 6. Set the environment variables:
    ```
    PLATFORM_LINKEDIN_COMPANY_CLIENT_ID=your-client-id
    PLATFORM_LINKEDIN_COMPANY_CLIENT_SECRET=your-client-secret
+   CLARITY_LINKEDIN_ALLOWED_ORGANIZATION_IDS=112378013
    ```
-
-If you set only the Path B (Company) credentials, Brightbean Studio automatically reuses them for personal connections too - refresh tokens (365-day) and inbox both work. You only need Path A vars if you have a separate Personal-only app.
-
-> **Note:** "Sign In with LinkedIn using OpenID Connect" / "Share on LinkedIn" and "Community Management API" are **mutually exclusive** on a single LinkedIn app. You need separate apps for Path A and Path B.
-
-> **Backwards compatibility:** the legacy `PLATFORM_LINKEDIN_CLIENT_ID` / `PLATFORM_LINKEDIN_CLIENT_SECRET` env vars are still honored as a fallback for both `linkedin_personal` and `linkedin_company` - existing self-hosters keep working without changes. The legacy credentials are assumed to be CM-approved; if your legacy app is OIDC-only, migrate it to `PLATFORM_LINKEDIN_PERSONAL_*`.
 
 ### TikTok
 

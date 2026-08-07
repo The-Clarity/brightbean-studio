@@ -8,6 +8,7 @@ from django.utils import timezone
 
 from apps.social_accounts.models import SocialAccount
 from apps.social_accounts.tasks import check_social_account_health
+from providers.linkedin_company import LinkedInCompanyProvider
 from providers.types import AccountProfile, OAuthTokens
 
 
@@ -19,6 +20,12 @@ def _profile(*, follower_count=0, avatar_url=None, name="", handle=None, platfor
         avatar_url=avatar_url,
         follower_count=follower_count,
     )
+
+
+def _linkedin_response(payload: dict) -> MagicMock:
+    response = MagicMock()
+    response.json.return_value = payload
+    return response
 
 
 @pytest.fixture
@@ -227,6 +234,122 @@ class TestCheckSocialAccountHealth:
         assert account.avatar_url == "https://old.example/avatar.jpg"
         assert account.account_name == "Kept Name"
         assert account.account_handle == "kept"
+
+    @patch("providers.get_provider")
+    def test_linkedin_company_health_reads_only_exact_page_identity(self, mock_get_provider, workspace, caplog):
+        account = SocialAccount.objects.create(
+            workspace=workspace,
+            platform="linkedin_company",
+            account_platform_id="112378013",
+            account_name="Old Page Name",
+            account_handle="old-page-handle",
+            oauth_access_token="page-token",
+            connection_status=SocialAccount.ConnectionStatus.CONNECTED,
+        )
+        provider = LinkedInCompanyProvider()
+        provider._request = MagicMock(
+            side_effect=[
+                _linkedin_response(
+                    {
+                        "elements": [
+                            {
+                                "organization": "urn:li:organization:112378013",
+                                "role": "ADMINISTRATOR",
+                                "state": "APPROVED",
+                                "roleAssignee": "urn:li:person:human-page-admin",
+                            }
+                        ]
+                    }
+                ),
+                _linkedin_response(
+                    {
+                        "id": 112378013,
+                        "localizedName": "Clarity",
+                        "vanityName": "the-clarity",
+                    }
+                ),
+            ]
+        )
+        mock_get_provider.return_value = provider
+
+        check_social_account_health.now(str(account.id))
+
+        account.refresh_from_db()
+        assert account.connection_status == SocialAccount.ConnectionStatus.CONNECTED
+        assert account.account_name == "Clarity"
+        assert account.account_handle == "the-clarity"
+        request_urls = [call.args[1] for call in provider._request.call_args_list]
+        assert request_urls == [
+            "https://api.linkedin.com/rest/organizationAcls",
+            "https://api.linkedin.com/rest/organizations/112378013",
+        ]
+        assert all("/v2/me" not in url and "/userinfo" not in url for url in request_urls)
+        assert "human-page-admin" not in account.account_name
+        assert "human-page-admin" not in account.account_handle
+        assert "human-page-admin" not in account.avatar_url
+        assert "human-page-admin" not in caplog.text
+
+    @patch("providers.get_provider")
+    def test_linkedin_company_health_preserves_page_fields_when_acl_is_missing(self, mock_get_provider, workspace):
+        account = SocialAccount.objects.create(
+            workspace=workspace,
+            platform="linkedin_company",
+            account_platform_id="112378013",
+            account_name="Clarity",
+            account_handle="the-clarity",
+            avatar_url="https://media.licdn.com/clarity-page.png",
+            oauth_access_token="page-token",
+            connection_status=SocialAccount.ConnectionStatus.CONNECTED,
+        )
+        provider = LinkedInCompanyProvider()
+        provider._request = MagicMock(
+            return_value=_linkedin_response(
+                {
+                    "elements": [
+                        {
+                            "organization": "urn:li:organization:999",
+                            "role": "ADMINISTRATOR",
+                            "state": "APPROVED",
+                        }
+                    ]
+                }
+            )
+        )
+        mock_get_provider.return_value = provider
+
+        check_social_account_health.now(str(account.id))
+
+        account.refresh_from_db()
+        assert account.connection_status == SocialAccount.ConnectionStatus.ERROR
+        assert account.account_name == "Clarity"
+        assert account.account_handle == "the-clarity"
+        assert account.avatar_url == "https://media.licdn.com/clarity-page.png"
+        assert provider._request.call_count == 1
+        assert "/rest/organizationAcls" in provider._request.call_args.args[1]
+
+    def test_health_never_resolves_or_refreshes_a_legacy_personal_provider(self, workspace, caplog):
+        account = SocialAccount.all_objects.create(
+            workspace=workspace,
+            platform="linkedin_personal",
+            account_platform_id="human-page-admin",
+            account_name="Historical Human",
+            account_handle="historical-human",
+            oauth_access_token="legacy-person-token",
+            oauth_refresh_token="legacy-person-refresh",
+            token_expires_at=timezone.now() + timedelta(minutes=1),
+            connection_status=SocialAccount.ConnectionStatus.CONNECTED,
+        )
+
+        with patch("providers.get_provider") as get_provider:
+            check_social_account_health.now(str(account.id))
+
+        account.refresh_from_db()
+        get_provider.assert_not_called()
+        assert account.account_name == "Historical Human"
+        assert account.account_handle == "historical-human"
+        assert account.oauth_access_token == "legacy-person-token"
+        assert account.oauth_refresh_token == "legacy-person-refresh"
+        assert "human-page-admin" not in caplog.text
 
     def test_nonexistent_account_does_not_raise(self, db):
         check_social_account_health.now("00000000-0000-0000-0000-000000000000")

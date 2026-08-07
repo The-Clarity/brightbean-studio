@@ -75,7 +75,7 @@ def social_account(db, workspace):
 
     return SocialAccount.objects.create(
         workspace=workspace,
-        platform="linkedin_personal",
+        platform="facebook",
         account_platform_id="li-abc",
         account_name="My LinkedIn",
         connection_status="connected",
@@ -91,7 +91,7 @@ def foreign_account(db, organization):
     other = Workspace.objects.create(name="Other WS", organization=organization)
     return SocialAccount.objects.create(
         workspace=other,
-        platform="linkedin_personal",
+        platform="facebook",
         account_platform_id="li-other",
         account_name="Other LinkedIn",
         connection_status="connected",
@@ -447,7 +447,7 @@ def second_account(db, workspace):
 
     return SocialAccount.objects.create(
         workspace=workspace,
-        platform="linkedin_personal",
+        platform="facebook",
         account_platform_id="li-second",
         account_name="Second LinkedIn",
         connection_status="connected",

@@ -31,7 +31,7 @@ def _make_workspace():
     ws = Workspace.objects.create(organization=org, name="WS", timezone="Europe/Berlin")
     sa = SocialAccount.objects.create(
         workspace=ws,
-        platform="linkedin_personal",
+        platform="facebook",
         account_platform_id="li-1",
         account_name="Acct",
         connection_status=SocialAccount.ConnectionStatus.CONNECTED,

@@ -79,7 +79,7 @@ class ClonePostEndpointTest(TestCase):
         )
         self.account = SocialAccount.objects.create(
             workspace=self.workspace,
-            platform="linkedin_personal",
+            platform="facebook",
             account_platform_id="li-clone",
             account_name="LI",
             connection_status=SocialAccount.ConnectionStatus.CONNECTED,

@@ -8,6 +8,21 @@ from apps.common.managers import WorkspaceScopedManager
 from apps.credentials.models import PlatformCredential
 
 
+class ClaritySocialAccountManager(WorkspaceScopedManager):
+    """Default runtime manager exposing only identities Clarity can operate."""
+
+    def get_queryset(self):
+        from django.db.models import Q
+
+        from .identity_policy import LINKEDIN_COMPANY, LINKEDIN_PERSONAL, allowed_linkedin_organization_ids
+
+        queryset = super().get_queryset().exclude(platform=LINKEDIN_PERSONAL)
+        allowed = allowed_linkedin_organization_ids()
+        if not allowed:
+            return queryset.exclude(platform=LINKEDIN_COMPANY)
+        return queryset.exclude(Q(platform=LINKEDIN_COMPANY) & ~Q(account_platform_id__in=allowed))
+
+
 class SocialAccount(models.Model):
     class ConnectionStatus(models.TextChoices):
         CONNECTED = "connected", "Connected"
@@ -81,7 +96,11 @@ class SocialAccount(models.Model):
     # place of the metric region. Cleared on successful reconnect.
     analytics_needs_reconnect = models.BooleanField(default=False)
 
-    objects = WorkspaceScopedManager()
+    # Historical personal-profile rows remain readable for explicit maintenance
+    # through ``all_objects``. Every normal product/API/background path uses the
+    # default manager and therefore cannot enumerate or operate those rows.
+    objects = ClaritySocialAccountManager()
+    all_objects = WorkspaceScopedManager()
 
     class Meta:
         db_table = "social_accounts_social_account"
@@ -142,7 +161,6 @@ class SocialAccount(models.Model):
         "facebook": 63206,
         "instagram": 2200,
         "instagram_login": 2200,
-        "linkedin_personal": 3000,
         "linkedin_company": 3000,
         "tiktok": 2200,
         "youtube": 5000,
@@ -210,20 +228,12 @@ class SocialAccount(models.Model):
     def supports_first_comment(self) -> bool:
         """Whether this account can have a first comment posted by the worker.
 
-        Most platforms answer purely from PLATFORM_FIELD_CONFIG. LinkedIn Personal
-        is the exception: in OIDC mode the socialActions.CREATE endpoint returns
-        403 ACCESS_DENIED because that endpoint is gated on Community Management
-        API approval. Resolve credentials and check ``_oauth_mode`` for it.
+        Historical personal LinkedIn rows are inert and cannot be selected for
+        publishing; return false defensively if one is accessed for maintenance.
         """
         if not self.field_config.get("supports_first_comment", True):
             return False
-        if self.platform == "linkedin_personal":
-            from apps.publisher.engine import _resolve_publish_credentials
-
-            creds = _resolve_publish_credentials(self)
-            if creds.get("_oauth_mode", "oidc") == "oidc":
-                return False
-        return True
+        return self.platform != "linkedin_personal"
 
     @property
     def platform_icon(self) -> str:
@@ -232,7 +242,6 @@ class SocialAccount(models.Model):
             "facebook": "f",
             "instagram": "ig",
             "instagram_login": "ig",
-            "linkedin_personal": "in",
             "linkedin_company": "in",
             "tiktok": "tk",
             "youtube": "yt",
@@ -325,5 +334,13 @@ class AnalyticsPlatformConfig(models.Model):
         """
         rows = list(cls.objects.values_list("platform", "is_enabled"))
         if not rows:
-            return [value for value, _label in PlatformCredential.Platform.choices]
-        return [platform for platform, enabled in rows if enabled]
+            return [
+                value
+                for value, _label in PlatformCredential.Platform.choices
+                if value != PlatformCredential.Platform.LINKEDIN_PERSONAL
+            ]
+        return [
+            platform
+            for platform, enabled in rows
+            if enabled and platform != PlatformCredential.Platform.LINKEDIN_PERSONAL
+        ]

@@ -133,12 +133,13 @@ def _build_dispatch_mocks(platform: str, account_platform_id: str, platform_extr
 class DispatchExtraInjectionTest(SimpleTestCase):
     """Verify _dispatch_to_provider injects platform-specific extras."""
 
+    @override_settings(CLARITY_LINKEDIN_ALLOWED_ORGANIZATION_IDS=("112378013",))
     @patch("apps.publisher.engine.get_provider")
     @patch("apps.publisher.engine._resolve_publish_credentials", return_value={})
     def test_injects_organization_author_for_linkedin_company(self, _mock_creds, mock_get_provider):
         engine, platform_post, mock_provider = _build_dispatch_mocks(
             platform="linkedin_company",
-            account_platform_id="98765",
+            account_platform_id="112378013",
         )
         mock_get_provider.return_value = mock_provider
 
@@ -146,7 +147,7 @@ class DispatchExtraInjectionTest(SimpleTestCase):
 
         mock_provider.publish_post.assert_called_once()
         _access_token, content = mock_provider.publish_post.call_args.args
-        self.assertEqual(content.extra.get("author"), "urn:li:organization:98765")
+        self.assertEqual(content.extra.get("author"), "urn:li:organization:112378013")
 
     @patch("apps.publisher.engine.get_provider")
     @patch("apps.publisher.engine._resolve_publish_credentials", return_value={})
@@ -163,29 +164,29 @@ class DispatchExtraInjectionTest(SimpleTestCase):
         _access_token, content = mock_provider.publish_post.call_args.args
         self.assertEqual(content.extra.get("ig_user_id"), "17841400000000000")
 
+    @override_settings(CLARITY_LINKEDIN_ALLOWED_ORGANIZATION_IDS=("112378013",))
     @patch("apps.publisher.engine.get_provider")
     @patch("apps.publisher.engine._resolve_publish_credentials", return_value={})
-    def test_does_not_overwrite_explicit_author(self, _mock_creds, mock_get_provider):
-        # When the caller has already set extra["author"], the engine must not
-        # overwrite it — important for callers that pass a different URN.
+    def test_linkedin_company_overwrites_untrusted_explicit_author(self, _mock_creds, mock_get_provider):
         engine, platform_post, mock_provider = _build_dispatch_mocks(
             platform="linkedin_company",
-            account_platform_id="98765",
-            platform_extra={"author": "urn:li:organization:override"},
+            account_platform_id="112378013",
+            platform_extra={"author": "urn:li:person:human-page-admin"},
         )
         mock_get_provider.return_value = mock_provider
 
         engine._dispatch_to_provider(platform_post)
 
         _access_token, content = mock_provider.publish_post.call_args.args
-        self.assertEqual(content.extra.get("author"), "urn:li:organization:override")
+        self.assertEqual(content.extra.get("author"), "urn:li:organization:112378013")
+        self.assertNotIn("urn:li:person:", repr(content.extra))
 
     @patch("apps.publisher.engine.get_provider")
     @patch("apps.publisher.engine._resolve_publish_credentials", return_value={})
     def test_does_not_inject_author_for_other_platforms(self, _mock_creds, mock_get_provider):
         # Sanity: the author-injection branch is scoped to linkedin_company only.
         engine, platform_post, mock_provider = _build_dispatch_mocks(
-            platform="linkedin_personal",
+            platform="facebook",
             account_platform_id="11111",
         )
         mock_get_provider.return_value = mock_provider
@@ -195,10 +196,9 @@ class DispatchExtraInjectionTest(SimpleTestCase):
         _access_token, content = mock_provider.publish_post.call_args.args
         self.assertNotIn("author", content.extra)
 
-    @override_settings(CLARITY_LINKEDIN_PAGE_ONLY=True)
     @patch("apps.publisher.engine.get_provider")
     @patch("apps.publisher.engine._resolve_publish_credentials", return_value={})
-    def test_page_only_mode_permanently_rejects_personal_linkedin(self, _mock_creds, mock_get_provider):
+    def test_permanently_rejects_personal_linkedin(self, _mock_creds, mock_get_provider):
         engine, platform_post, _mock_provider = _build_dispatch_mocks(
             platform="linkedin_personal",
             account_platform_id="legacy-person",
@@ -210,13 +210,10 @@ class DispatchExtraInjectionTest(SimpleTestCase):
         self.assertFalse(caught.exception.retryable)
         mock_get_provider.assert_not_called()
 
-    @override_settings(
-        CLARITY_LINKEDIN_PAGE_ONLY=True,
-        CLARITY_LINKEDIN_ALLOWED_ORGANIZATION_IDS=("112378013",),
-    )
+    @override_settings(CLARITY_LINKEDIN_ALLOWED_ORGANIZATION_IDS=("112378013",))
     @patch("apps.publisher.engine.get_provider")
     @patch("apps.publisher.engine._resolve_publish_credentials", return_value={})
-    def test_page_only_mode_permanently_rejects_non_clarity_page(self, _mock_creds, mock_get_provider):
+    def test_permanently_rejects_non_clarity_page(self, _mock_creds, mock_get_provider):
         engine, platform_post, _mock_provider = _build_dispatch_mocks(
             platform="linkedin_company",
             account_platform_id="999",
@@ -352,9 +349,9 @@ class PublishedPostLeavesQueueTest(TestCase):
         self.workspace = Workspace.objects.create(organization=self.org, name="WS")
         self.account = SocialAccount.objects.create(
             workspace=self.workspace,
-            platform="linkedin_personal",
-            account_platform_id="li-1",
-            account_name="LI",
+            platform="facebook",
+            account_platform_id="fb-1",
+            account_name="Facebook",
             connection_status=SocialAccount.ConnectionStatus.CONNECTED,
         )
         self.queue = Queue.objects.create(workspace=self.workspace, name="Q", social_account=self.account)

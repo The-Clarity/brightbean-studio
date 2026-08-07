@@ -8,10 +8,7 @@ from django.conf import settings
 
 LINKEDIN_PERSONAL = "linkedin_personal"
 LINKEDIN_COMPANY = "linkedin_company"
-
-
-def _page_only_enabled() -> bool:
-    return bool(getattr(settings, "CLARITY_LINKEDIN_PAGE_ONLY", False))
+CLARITY_LINKEDIN_ORGANIZATION_ID = "112378013"
 
 
 def _organization_id(value: object) -> str:
@@ -21,15 +18,17 @@ def _organization_id(value: object) -> str:
 
 
 def allowed_linkedin_organization_ids() -> frozenset[str]:
-    """Return the normalized deployment allowlist of LinkedIn organization IDs."""
+    """Return the one code-pinned Clarity Page, or fail closed on config drift."""
     configured = getattr(settings, "CLARITY_LINKEDIN_ALLOWED_ORGANIZATION_IDS", ())
     values: Iterable[object] = configured.split(",") if isinstance(configured, str) else configured
-    return frozenset(normalized for value in values if (normalized := _organization_id(value)))
+    normalized = frozenset(value for item in values if (value := _organization_id(item)))
+    exact = frozenset({CLARITY_LINKEDIN_ORGANIZATION_ID})
+    return frozenset() if normalized and normalized != exact else exact
 
 
 def platform_is_connectable(platform: str) -> bool:
     """Whether the deployment permits initiating a new connection."""
-    return not (_page_only_enabled() and platform == LINKEDIN_PERSONAL)
+    return platform != LINKEDIN_PERSONAL
 
 
 def filter_platform_choices(choices):
@@ -38,18 +37,13 @@ def filter_platform_choices(choices):
 
 
 def filter_linkedin_pages(pages: Iterable[dict]) -> list[dict]:
-    """In Page-only mode, retain only explicitly approved Clarity organizations."""
-    page_list = list(pages)
-    if not _page_only_enabled():
-        return page_list
+    """Retain only explicitly approved Clarity organizations."""
     allowed = allowed_linkedin_organization_ids()
-    return [page for page in page_list if _organization_id(page.get("id")) in allowed]
+    return [page for page in pages if _organization_id(page.get("id")) in allowed]
 
 
 def linkedin_publish_block_reason(platform: str, account_platform_id: object) -> str | None:
     """Return a permanent-failure reason when a LinkedIn target violates policy."""
-    if not _page_only_enabled():
-        return None
     if platform == LINKEDIN_PERSONAL:
         return "Personal LinkedIn publishing is disabled; use the approved Clarity Page."
     if platform != LINKEDIN_COMPANY:

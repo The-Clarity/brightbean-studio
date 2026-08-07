@@ -91,7 +91,7 @@ def social_account(db, workspace):
 
     return SocialAccount.objects.create(
         workspace=workspace,
-        platform="linkedin_personal",
+        platform="facebook",
         account_platform_id="li-mcpfix",
         account_name="LinkedIn MCP Fix",
         connection_status="connected",

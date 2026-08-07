@@ -41,7 +41,7 @@ class ApprovalWorkflowBase(TestCase):
         WorkspaceMembership.objects.create(user=self.author, workspace=self.ws, workspace_role="contributor")
         self.account = SocialAccount.objects.create(
             workspace=self.ws,
-            platform="linkedin_personal",
+            platform="facebook",
             account_platform_id="li-1",
             account_name="LI",
             connection_status="connected",
@@ -449,7 +449,7 @@ class PortalMixedPostActionTests(TestCase):
         )
         self.li = SocialAccount.objects.create(
             workspace=self.ws,
-            platform="linkedin_personal",
+            platform="facebook",
             account_platform_id="li-1",
             account_name="LI",
             connection_status="connected",

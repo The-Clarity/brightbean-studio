@@ -283,20 +283,25 @@ class SocialProvider(ABC):
 
         if response.status_code == 429:
             retry_after = response.headers.get("Retry-After")
-            logger.error("%s API 429 response: %s", self.platform_name, response.text[:1000])
+            logger.error(
+                "%s API 429 response: %s",
+                self.platform_name,
+                self._error_response_detail(response, limit=1000),
+            )
             raise RateLimitError(
-                f"Rate limit exceeded for {self.platform_name}: {response.text[:500]}",
+                f"Rate limit exceeded for {self.platform_name}: {self._error_response_detail(response, limit=500)}",
                 retry_after=int(retry_after) if retry_after else None,
                 platform=self.platform_name,
-                raw_response=self._safe_json(response),
+                raw_response=self._error_response_data(response),
             )
 
         if response.status_code >= 400:
             raise APIError(
-                f"{self.platform_name} API error {response.status_code}: {response.text[:500]}",
+                f"{self.platform_name} API error {response.status_code}: "
+                f"{self._error_response_detail(response, limit=500)}",
                 status_code=response.status_code,
                 platform=self.platform_name,
-                raw_response=self._safe_json(response),
+                raw_response=self._error_response_data(response),
             )
 
         return response
@@ -308,3 +313,11 @@ class SocialProvider(ABC):
             return response.json()
         except Exception:
             return {}
+
+    def _error_response_detail(self, response: httpx.Response, *, limit: int) -> str:
+        """Return the bounded response detail safe for exceptions and logs."""
+        return response.text[:limit]
+
+    def _error_response_data(self, response: httpx.Response) -> dict:
+        """Return the response payload safe to attach to a provider error."""
+        return self._safe_json(response)

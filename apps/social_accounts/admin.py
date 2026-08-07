@@ -32,6 +32,9 @@ class PlatformVisibilityAdmin(admin.ModelAdmin):
     list_display_links = ("platform",)
     ordering = ("platform",)
 
+    def get_queryset(self, request):
+        return super().get_queryset(request).exclude(platform="linkedin_personal")
+
     def has_add_permission(self, request):
         return False
 
@@ -45,6 +48,9 @@ class AnalyticsPlatformConfigAdmin(admin.ModelAdmin):
     list_editable = ("is_enabled",)
     list_display_links = ("platform",)
     ordering = ("platform",)
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).exclude(platform="linkedin_personal")
 
     def has_add_permission(self, request):
         return False

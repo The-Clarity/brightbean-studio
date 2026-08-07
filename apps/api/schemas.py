@@ -61,7 +61,6 @@ class AccountSummary(Schema):
         description=(
             "True when the platform can auto-post a first comment after publish. "
             "False for TikTok, Pinterest, Bluesky, Google Business. "
-            "LinkedIn Personal returns false when authorized via OIDC instead of the Community Management API. "
             "If false, ``first_comment`` is silently dropped at publish time."
         ),
     )
@@ -162,7 +161,7 @@ class CreatePostRequest(Schema):
             "Auto-posted as a reply ~120s after the main post lands. "
             "Silently dropped at publish time when the target account's "
             "``supports_first_comment`` is false (TikTok, Pinterest, "
-            "Bluesky, Google Business; LinkedIn Personal in OIDC mode)."
+            "Bluesky, Google Business)."
         ),
     )
     internal_notes: str = Field(
@@ -501,7 +500,7 @@ class AccountAnalyticsResponse(Schema):
         ...,
         description=(
             "``false`` for platforms whose APIs don't expose aggregate analytics "
-            "(currently LinkedIn Personal, Bluesky, Mastodon). Metric arrays are empty when false."
+            "(currently Bluesky and Mastodon). Metric arrays are empty when false."
         ),
     )
     unavailable_reason: str | None = Field(

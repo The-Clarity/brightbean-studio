@@ -21,7 +21,6 @@ REQUIRED_CREDENTIAL_KEYS = {
     "tiktok": (("client_key",), ("client_secret",)),
     "youtube": (("client_id",), ("client_secret",)),
     "google_business": (("client_id",), ("client_secret",)),
-    "linkedin_personal": (("client_id",), ("client_secret",)),
     "linkedin_company": (("client_id",), ("client_secret",)),
 }
 
@@ -126,6 +125,9 @@ def resolve_platform_credentials(platform, org_id):
     to the org's admin-entered ``PlatformCredential`` row. Returns a fresh dict.
     """
     from django.conf import settings
+
+    if platform == PlatformCredential.Platform.LINKEDIN_PERSONAL:
+        return {}
 
     env_creds = getattr(settings, "PLATFORM_CREDENTIALS_FROM_ENV", {}).get(platform, {})
     # .env wins only when it fully satisfies the platform's required keys, so a

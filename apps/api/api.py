@@ -54,7 +54,7 @@ api = NinjaAPI(
         "tells you when the oldest counting row ages out.\n\n"
         "**First comments.** When a target account's "
         "`supports_first_comment` is `false` (TikTok, Pinterest, Bluesky, "
-        "Google Business; LinkedIn Personal in OIDC mode), the "
+        "Google Business), the "
         "`first_comment` field is silently dropped at publish time — call "
         "`GET /accounts/` or `GET /me/` first to check before composing.\n\n"
         "**Deleting posts.** Posts cannot be deleted via the API in v1. "

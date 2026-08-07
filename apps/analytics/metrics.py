@@ -49,8 +49,6 @@ PLATFORM_METRICS: dict[str, list[str]] = {
     "facebook": ["views", "reach", "reactions", "comments", "shares", "clicks", "follows", "engagement"],
     # LinkedIn share statistics: impressions, reactions, comments, reposts, clicks, engagement.
     "linkedin_company": ["impressions", "reactions", "comments", "reposts", "clicks", "follows", "engagement"],
-    # LinkedIn Personal: only socialActions counts (no impressions/reach per API).
-    "linkedin_personal": ["likes", "comments", "shares"],
     # YouTube Analytics: views, watch_time, avg_view_pct, likes, comments, shares, subscribers gained.
     "youtube": ["views", "watch_time", "avg_view_pct", "likes", "comments", "shares", "subscribers"],
     # TikTok video metrics: view/like/comment/share counts from /v2/video/query/.
@@ -76,7 +74,6 @@ PLATFORM_PRIMARY: dict[str, str] = {
     "instagram_login": "reach",
     "facebook": "reach",
     "linkedin_company": "impressions",
-    "linkedin_personal": "likes",
     "youtube": "views",
     "tiktok": "views",
     "bluesky": "likes",
@@ -91,7 +88,6 @@ PLATFORM_COLOR: dict[str, str] = {
     "instagram": "#E4405F",
     "instagram_login": "#E4405F",
     "facebook": "#1877F2",
-    "linkedin_personal": "#0A66C2",
     "linkedin_company": "#0A66C2",
     "youtube": "#FF0000",
     "tiktok": "#111111",

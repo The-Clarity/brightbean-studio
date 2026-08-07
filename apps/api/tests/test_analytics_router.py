@@ -82,15 +82,15 @@ def instagram_account(db, workspace):
 
 
 @pytest.fixture
-def linkedin_personal_account(db, workspace):
-    """LinkedIn Personal — in NO_ANALYTICS_PLATFORMS."""
+def unavailable_analytics_account(db, workspace):
+    """Bluesky is active but has no aggregate analytics surface."""
     from apps.social_accounts.models import SocialAccount
 
     return SocialAccount.objects.create(
         workspace=workspace,
-        platform="linkedin_personal",
-        account_platform_id="li-personal",
-        account_name="My LinkedIn",
+        platform="bluesky",
+        account_platform_id="did:plc:no-aggregate-analytics",
+        account_name="Bluesky Analytics Unavailable",
         connection_status="connected",
     )
 
@@ -125,10 +125,10 @@ def foreign_account(db, organization):
 
 
 @pytest.fixture
-def issued_key(db, user, owner_memberships, workspace, instagram_account, linkedin_personal_account):
+def issued_key(db, user, owner_memberships, workspace, instagram_account, unavailable_analytics_account):
     return services.issue_api_key(
         workspace=workspace,
-        social_accounts=[instagram_account, linkedin_personal_account],
+        social_accounts=[instagram_account, unavailable_analytics_account],
         issued_by=user,
         name="analytics-smoke",
         permissions=list(PERMISSION_KEYS),
@@ -278,12 +278,12 @@ class TestAccountAnalytics:
         # First-poll ETA: shortly from now (we asked for +5 min).
         assert body["next_sync_eta"] is not None
 
-    def test_unavailable_platform_returns_reason(self, client_with_token, linkedin_personal_account):
-        r = client_with_token.get(f"/api/v1/analytics/accounts/{linkedin_personal_account.id}")
+    def test_unavailable_platform_returns_reason(self, client_with_token, unavailable_analytics_account):
+        r = client_with_token.get(f"/api/v1/analytics/accounts/{unavailable_analytics_account.id}")
         assert r.status_code == 200
         body = r.json()
         assert body["analytics_available"] is False
-        assert "LinkedIn" in body["unavailable_reason"]
+        assert "Bluesky" in body["unavailable_reason"]
         assert body["hero_metrics"] == []
         assert body["engagement"] is None
         assert body["follower_growth"] is None
@@ -358,8 +358,8 @@ def draft_post(db, workspace, instagram_account):
 
 
 @pytest.fixture
-def mixed_platform_post(db, workspace, instagram_account, linkedin_personal_account):
-    """Post with one Instagram child (analytics) + one LinkedIn Personal child (no analytics)."""
+def mixed_platform_post(db, workspace, instagram_account, unavailable_analytics_account):
+    """Post with one Instagram child (analytics) + one Bluesky child (no aggregate analytics)."""
     from apps.composer.models import PlatformPost, Post
 
     post = Post.objects.create(workspace=workspace, caption="cross-posted")
@@ -373,7 +373,7 @@ def mixed_platform_post(db, workspace, instagram_account, linkedin_personal_acco
     )
     PlatformPost.objects.create(
         post=post,
-        social_account=linkedin_personal_account,
+        social_account=unavailable_analytics_account,
         status="published",
         published_at=published_at,
         platform_post_id="li-urn-mix",
@@ -438,15 +438,15 @@ class TestPostAnalytics:
 
         by_platform = {child["platform"]: child for child in body["platform_posts"]}
         ig_child = by_platform["instagram"]
-        li_child = by_platform["linkedin_personal"]
+        unavailable_child = by_platform["bluesky"]
 
         assert ig_child["analytics_available"] is True
         assert ig_child["metric_tiles"], "instagram child should have tiles"
 
-        assert li_child["analytics_available"] is False
-        assert li_child["unavailable_reason"] is not None
-        assert li_child["metric_tiles"] == []
-        assert li_child["captured_at"] is None
+        assert unavailable_child["analytics_available"] is False
+        assert unavailable_child["unavailable_reason"] is not None
+        assert unavailable_child["metric_tiles"] == []
+        assert unavailable_child["captured_at"] is None
 
     def test_post_outside_allowlist_is_404(self, client_with_token, out_of_scope_post):
         r = client_with_token.get(f"/api/v1/analytics/posts/{out_of_scope_post.id}")

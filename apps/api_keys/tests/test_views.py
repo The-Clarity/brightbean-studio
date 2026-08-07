@@ -103,7 +103,7 @@ def social_account(db, workspace):
 
     return SocialAccount.objects.create(
         workspace=workspace,
-        platform="linkedin_personal",
+        platform="facebook",
         account_platform_id="li-ui",
         account_name="LinkedIn UI",
         connection_status=SocialAccount.ConnectionStatus.CONNECTED,
@@ -116,7 +116,7 @@ def disconnected_account(db, workspace):
 
     return SocialAccount.objects.create(
         workspace=workspace,
-        platform="linkedin_personal",
+        platform="facebook",
         account_platform_id="li-broken",
         account_name="Broken LinkedIn",
         connection_status=SocialAccount.ConnectionStatus.DISCONNECTED,
@@ -373,7 +373,7 @@ class TestIssue:
         other_ws = Workspace.objects.create(name="Other WS", organization=workspace.organization)
         foreign_sa = SocialAccount.objects.create(
             workspace=other_ws,
-            platform="linkedin_personal",
+            platform="facebook",
             account_platform_id="li-foreign",
             account_name="Foreign LinkedIn",
             connection_status=SocialAccount.ConnectionStatus.CONNECTED,
@@ -462,7 +462,7 @@ class TestRevoke:
         )
         foreign_sa = SocialAccount.objects.create(
             workspace=foreign_ws,
-            platform="linkedin_personal",
+            platform="facebook",
             account_platform_id="li-other",
             account_name="Other LinkedIn",
             connection_status=SocialAccount.ConnectionStatus.CONNECTED,
@@ -518,7 +518,7 @@ class TestEditKey:
 
         second = SocialAccount.objects.create(
             workspace=workspace,
-            platform="linkedin_personal",
+            platform="facebook",
             account_platform_id="li-second-ui",
             account_name="Second UI",
             connection_status=SocialAccount.ConnectionStatus.CONNECTED,
@@ -606,7 +606,7 @@ class TestEditKey:
         )
         foreign_sa = SocialAccount.objects.create(
             workspace=foreign_ws,
-            platform="linkedin_personal",
+            platform="facebook",
             account_platform_id="li-foreign-edit",
             account_name="Foreign Edit LinkedIn",
             connection_status=SocialAccount.ConnectionStatus.CONNECTED,

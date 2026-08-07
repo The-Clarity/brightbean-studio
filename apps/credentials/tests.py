@@ -41,6 +41,7 @@ def test_derive_false_for_partial_or_empty():
 def test_derive_false_for_credential_less_platforms():
     assert derive_is_configured("bluesky", {"anything": "x"}) is False
     assert derive_is_configured("mastodon", {"client_id": "x", "client_secret": "y"}) is False
+    assert derive_is_configured("linkedin_personal", {"client_id": "x", "client_secret": "y"}) is False
 
 
 # ---------------------------------------------------------------------------
@@ -104,6 +105,21 @@ def test_resolve_falls_back_to_db_when_env_empty(organization):
 @override_settings(PLATFORM_CREDENTIALS_FROM_ENV={})
 def test_resolve_returns_empty_when_nothing_configured(organization):
     assert resolve_platform_credentials("facebook", organization.id) == {}
+
+
+@pytest.mark.django_db
+@override_settings(
+    PLATFORM_CREDENTIALS_FROM_ENV={"linkedin_personal": {"client_id": "personal", "client_secret": "secret"}}
+)
+def test_personal_linkedin_credentials_never_resolve(organization):
+    PlatformCredential.objects.create(
+        organization=organization,
+        platform="linkedin_personal",
+        credentials={"client_id": "stored-personal", "client_secret": "stored-secret"},
+        is_configured=True,
+    )
+
+    assert resolve_platform_credentials("linkedin_personal", organization.id) == {}
 
 
 @pytest.mark.django_db
@@ -216,6 +232,7 @@ def test_admin_form_excludes_credential_less_platforms():
     assert "youtube" in choice_values
     assert "bluesky" not in choice_values
     assert "mastodon" not in choice_values
+    assert "linkedin_personal" not in choice_values
 
 
 # ---------------------------------------------------------------------------
@@ -347,7 +364,6 @@ REALISTIC_ENV = {
     "instagram": {"app_id": "fb-id", "app_secret": "fb-sec"},
     "threads": {"app_id": "fb-id", "app_secret": "fb-sec"},
     "instagram_login": {"app_id": "ig-id", "app_secret": "ig-sec"},
-    "linkedin_personal": {"client_id": "li-id", "client_secret": "li-sec", "_oauth_mode": "oidc"},
     "linkedin_company": {"client_id": "lic-id", "client_secret": "lic-sec"},
     "tiktok": {"client_key": "tt-key", "client_secret": "tt-sec"},
     "youtube": {"client_id": "g-id", "client_secret": "g-sec"},

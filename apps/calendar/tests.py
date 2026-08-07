@@ -333,7 +333,7 @@ class QueueSlotPublishedGuardTests(TestCase):
         self.workspace = Workspace.objects.create(organization=self.org, name="Guard WS")
         self.account = SocialAccount.objects.create(
             workspace=self.workspace,
-            platform="linkedin_personal",
+            platform="facebook",
             account_platform_id="li-guard",
             account_name="Guard",
             connection_status=SocialAccount.ConnectionStatus.CONNECTED,
@@ -411,7 +411,7 @@ class RepairPublishedScheduledAtTests(TestCase):
         self.workspace = Workspace.objects.create(organization=self.org, name="Repair WS")
         self.account = SocialAccount.objects.create(
             workspace=self.workspace,
-            platform="linkedin_personal",
+            platform="facebook",
             account_platform_id="li-repair",
             account_name="Repair",
             connection_status=SocialAccount.ConnectionStatus.CONNECTED,
@@ -843,7 +843,7 @@ class PublishTabTimezoneTests(TestCase):
         )
         self.sa = SocialAccount.objects.create(
             workspace=self.ws,
-            platform="linkedin_personal",
+            platform="facebook",
             account_platform_id="li-tz",
             account_name="A",
             connection_status=SocialAccount.ConnectionStatus.CONNECTED,
@@ -896,7 +896,7 @@ class SlotOccupancyQueueTests(TestCase):
         self.workspace = Workspace.objects.create(organization=self.org, name="Slot WS")
         self.account = SocialAccount.objects.create(
             workspace=self.workspace,
-            platform="linkedin_personal",
+            platform="facebook",
             account_platform_id="li-slot",
             account_name="Slot",
             connection_status=SocialAccount.ConnectionStatus.CONNECTED,
@@ -1182,7 +1182,7 @@ class QueueEntryEndpointTests(TestCase):
         )
         self.account = SocialAccount.objects.create(
             workspace=self.workspace,
-            platform="linkedin_personal",
+            platform="facebook",
             account_platform_id="li-ep",
             account_name="EP",
             connection_status=SocialAccount.ConnectionStatus.CONNECTED,
@@ -1228,7 +1228,7 @@ class QueueEntryEndpointTests(TestCase):
         other_ws = Workspace.objects.create(organization=other_org, name="Other WS")
         other_acct = SocialAccount.objects.create(
             workspace=other_ws,
-            platform="linkedin_personal",
+            platform="facebook",
             account_platform_id="li-other",
             account_name="O",
             connection_status=SocialAccount.ConnectionStatus.CONNECTED,

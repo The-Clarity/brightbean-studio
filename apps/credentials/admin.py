@@ -14,6 +14,9 @@ class PlatformCredentialAdmin(admin.ModelAdmin):
     # fields have no flow yet — keep them read-only so they can't be hand-set.
     readonly_fields = ("id", "is_configured", "test_result", "tested_at", "created_at", "updated_at")
 
+    def get_queryset(self, request):
+        return super().get_queryset(request).exclude(platform=PlatformCredential.Platform.LINKEDIN_PERSONAL)
+
     # Editing credentials necessarily reveals decrypted secrets on the change
     # page, so restrict the whole model to superusers (admin already requires
     # is_staff).

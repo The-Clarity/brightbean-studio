@@ -71,7 +71,7 @@ def social_account(db, workspace):
 
     return SocialAccount.objects.create(
         workspace=workspace,
-        platform="linkedin_personal",
+        platform="facebook",
         account_platform_id="li-overrides",
         account_name="Overrides LinkedIn",
         connection_status="connected",
@@ -209,7 +209,7 @@ class TestPlatformOverrides:
 
         other = SocialAccount.objects.create(
             workspace=workspace,
-            platform="linkedin_personal",
+            platform="facebook",
             account_platform_id="li-other",
             account_name="Other",
             connection_status="connected",

@@ -15,7 +15,6 @@ from .google_business import GoogleBusinessProvider
 from .instagram import InstagramProvider
 from .instagram_login import InstagramLoginProvider
 from .linkedin_company import LinkedInCompanyProvider
-from .linkedin_personal import LinkedInPersonalProvider
 from .mastodon import MastodonProvider
 from .pinterest import PinterestProvider
 from .threads import ThreadsProvider
@@ -29,7 +28,6 @@ PROVIDER_REGISTRY: dict[str, type[SocialProvider]] = {
     "facebook": FacebookProvider,
     "instagram": InstagramProvider,
     "instagram_login": InstagramLoginProvider,
-    "linkedin_personal": LinkedInPersonalProvider,
     "linkedin_company": LinkedInCompanyProvider,
     "tiktok": TikTokProvider,
     "youtube": YouTubeProvider,
@@ -55,6 +53,9 @@ def get_provider(platform: str, credentials: dict | None = None) -> SocialProvid
     Raises:
         ValueError: If no provider is registered for the given platform.
     """
+    if platform == "linkedin_personal":
+        raise ValueError("Personal LinkedIn provider is disabled; use the approved Clarity Page.")
+
     provider_cls = PROVIDER_REGISTRY.get(platform)
     if provider_cls is None:
         raise ValueError(f"No provider registered for platform: {platform}")

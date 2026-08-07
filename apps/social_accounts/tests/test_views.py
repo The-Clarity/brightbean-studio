@@ -81,6 +81,22 @@ class TestAccountListView:
         response = authenticated_client.get(url)
         assert b"My Facebook Page" in response.content
 
+    def test_historical_personal_linkedin_rows_are_hidden_from_runtime_and_ui(self, authenticated_client, workspace):
+        historical = SocialAccount.all_objects.create(
+            workspace=workspace,
+            platform="linkedin_personal",
+            account_platform_id="human-page-admin",
+            account_name="Historical Human Identity",
+            account_handle="historical-human",
+        )
+
+        response = authenticated_client.get(reverse("social_accounts:list", kwargs={"workspace_id": workspace.id}))
+
+        assert response.status_code == 200
+        assert b"Historical Human Identity" not in response.content
+        assert not SocialAccount.objects.filter(pk=historical.pk).exists()
+        assert SocialAccount.all_objects.filter(pk=historical.pk).exists()
+
     def test_shows_empty_state(self, authenticated_client, workspace):
         url = reverse("social_accounts:list", kwargs={"workspace_id": workspace.id})
         response = authenticated_client.get(url)
@@ -95,8 +111,7 @@ class TestConnectPlatformView:
         assert response.status_code == 200
         assert b"Connect a Platform" in response.content
 
-    @override_settings(CLARITY_LINKEDIN_PAGE_ONLY=True)
-    def test_page_only_mode_hides_personal_linkedin(self, authenticated_client, workspace):
+    def test_hides_personal_linkedin(self, authenticated_client, workspace):
         url = reverse("social_accounts:connect", kwargs={"workspace_id": workspace.id})
         response = authenticated_client.get(url)
 
@@ -104,8 +119,7 @@ class TestConnectPlatformView:
         assert b"LinkedIn (Company Page)" in response.content
         assert b"LinkedIn (Personal Profile)" not in response.content
 
-    @override_settings(CLARITY_LINKEDIN_PAGE_ONLY=True)
-    def test_page_only_mode_rejects_personal_linkedin_server_side(self, authenticated_client, workspace):
+    def test_rejects_personal_linkedin_server_side(self, authenticated_client, workspace):
         url = reverse("social_accounts:connect", kwargs={"workspace_id": workspace.id})
 
         with (
@@ -191,9 +205,8 @@ class TestConnectPlatformView:
 
 @pytest.mark.django_db
 class TestReconnectView:
-    @override_settings(CLARITY_LINKEDIN_PAGE_ONLY=True)
-    def test_page_only_mode_blocks_legacy_personal_reconnect(self, authenticated_client, workspace):
-        account = SocialAccount.objects.create(
+    def test_historical_personal_reconnect_is_not_addressable(self, authenticated_client, workspace):
+        account = SocialAccount.all_objects.create(
             workspace=workspace,
             platform="linkedin_personal",
             account_platform_id="legacy-person",
@@ -207,7 +220,7 @@ class TestReconnectView:
         with patch("apps.social_accounts.views._get_provider_for_platform") as get_provider:
             response = authenticated_client.post(url)
 
-        assert response.status_code == 302
+        assert response.status_code == 404
         get_provider.assert_not_called()
 
     def test_pkce_reconnect_generates_and_forwards_verifier(self, authenticated_client, workspace):
@@ -284,10 +297,7 @@ class TestOAuthCallbackView:
         assert page_data["platform"] == "instagram"
         assert page_data["pages"][0]["id"] == "17841400000000000"
 
-    @override_settings(
-        CLARITY_LINKEDIN_PAGE_ONLY=True,
-        CLARITY_LINKEDIN_ALLOWED_ORGANIZATION_IDS=("112378013",),
-    )
+    @override_settings(CLARITY_LINKEDIN_ALLOWED_ORGANIZATION_IDS=("112378013",))
     def test_linkedin_company_callback_keeps_only_clarity_page(self, authenticated_client, workspace, user):
         nonce = "nonce-linkedin-company"
         state = _sign_state(workspace.id, "linkedin_company", user.id, nonce)

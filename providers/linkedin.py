@@ -59,6 +59,19 @@ def _encode_urn(urn: str) -> str:
 class LinkedInProvider(SocialProvider):
     """LinkedIn Marketing API v2 provider."""
 
+    def _error_response_detail(self, _response: httpx.Response, *, limit: int) -> str:
+        """Never expose LinkedIn's free-form response body.
+
+        Organization ACL and OAuth errors can echo the consenting Page
+        administrator's member URN, name, or avatar. Those values are not part
+        of Clarity's Page identity and must not enter logs, persisted errors,
+        or API responses.
+        """
+        return "LinkedIn response details omitted"[:limit]
+
+    def _error_response_data(self, _response: httpx.Response) -> dict:
+        return {}
+
     # ------------------------------------------------------------------
     # Metadata
     # ------------------------------------------------------------------
@@ -93,8 +106,7 @@ class LinkedInProvider(SocialProvider):
     @property
     def required_scopes(self) -> list[str]:
         return [
-            "w_member_social",
-            "r_member_social",
+            "rw_organization_admin",
             "w_organization_social",
             "r_organization_social",
         ]
@@ -187,33 +199,31 @@ class LinkedInProvider(SocialProvider):
     # ------------------------------------------------------------------
 
     def get_profile(self, access_token: str) -> AccountProfile:
-        resp = self._request(
-            "GET",
-            f"{API_BASE}/v2/me",
-            access_token=access_token,
-            headers=LINKEDIN_HEADERS,
-        )
-        data = resp.json()
-        first = data.get("localizedFirstName", "")
-        last = data.get("localizedLastName", "")
-        name = f"{first} {last}".strip() or data.get("vanityName", "")
-        return AccountProfile(
-            platform_id=data.get("id", ""),
-            name=name,
-            avatar_url=data.get("profilePicture", {}).get("displayImage"),
-            extra=data,
+        raise APIError(
+            "LinkedIn identities must be resolved by the approved Clarity Page provider",
+            platform=self.platform_name,
+            retryable=False,
         )
 
     # ------------------------------------------------------------------
     # Publishing
     # ------------------------------------------------------------------
 
+    def _resolve_actor_urn(self, access_token: str, requested_actor: str | None = None) -> str:
+        """Resolve the identity used by every LinkedIn write/read actor path.
+
+        The shared implementation cannot infer or accept an actor. The Clarity
+        Page subclass overrides this boundary and pins every operation to the
+        one approved organization URN.
+        """
+        raise APIError(
+            "LinkedIn actor resolution requires the approved Clarity Page provider",
+            platform=self.platform_name,
+            retryable=False,
+        )
+
     def publish_post(self, access_token: str, content: PublishContent) -> PublishResult:
-        author = content.extra.get("author")
-        if not author:
-            # Derive from profile
-            profile = self.get_profile(access_token)
-            author = f"urn:li:person:{profile.platform_id}"
+        author = self._resolve_actor_urn(access_token, content.extra.get("author"))
 
         if content.post_type == PostType.IMAGE and (content.media_files or content.media_urls):
             return self._publish_image_post(access_token, author, content)
@@ -483,8 +493,7 @@ class LinkedInProvider(SocialProvider):
 
         post_id should be the post URN (e.g. urn:li:share:123456).
         """
-        profile = self.get_profile(access_token)
-        actor = f"urn:li:person:{profile.platform_id}"
+        actor = self._resolve_actor_urn(access_token)
 
         resp = self._request(
             "POST",
@@ -505,9 +514,7 @@ class LinkedInProvider(SocialProvider):
     # ------------------------------------------------------------------
 
     def get_messages(self, access_token: str, since: datetime | None = None) -> list[InboxMessage]:
-        # Determine author URN
-        profile = self.get_profile(access_token)
-        author = f"urn:li:person:{profile.platform_id}"
+        author = self._resolve_actor_urn(access_token)
 
         # Fetch recent posts by this author
         params: dict = {"q": "author", "author": author, "count": 20}
@@ -601,8 +608,7 @@ class LinkedInProvider(SocialProvider):
                 platform=self.platform_name,
             )
 
-        profile = self.get_profile(access_token)
-        actor = f"urn:li:person:{profile.platform_id}"
+        actor = self._resolve_actor_urn(access_token)
 
         resp = self._request(
             "POST",

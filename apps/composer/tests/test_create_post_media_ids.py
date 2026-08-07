@@ -21,7 +21,7 @@ def _setup():
     ws = Workspace.objects.create(organization=org, name="WS")
     sa = SocialAccount.objects.create(
         workspace=ws,
-        platform="linkedin_personal",
+        platform="facebook",
         account_platform_id="li-1",
         account_name="x",
         connection_status="connected",

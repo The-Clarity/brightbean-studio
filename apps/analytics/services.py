@@ -679,7 +679,6 @@ def _media_kind(post: PlatformPost) -> str:
         "tiktok": "Video",
         "youtube": "Video",
         "linkedin_company": "Post",
-        "linkedin_personal": "Post",
         "facebook": "Post",
         "bluesky": "Post",
         "threads": "Post",

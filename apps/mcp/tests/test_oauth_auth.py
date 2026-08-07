@@ -74,7 +74,7 @@ def _make_user_with_workspace(email: str, role: str):
     user.save(update_fields=["last_workspace_id"])
     sa = SocialAccount.objects.create(
         workspace=ws,
-        platform="linkedin_personal",
+        platform="facebook",
         account_platform_id=f"li-{email}",
         account_name="LinkedIn OAuth",
         connection_status="connected",

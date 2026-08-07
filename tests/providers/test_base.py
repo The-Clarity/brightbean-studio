@@ -15,7 +15,6 @@ class TestProviderRegistry:
             "facebook",
             "instagram",
             "instagram_login",
-            "linkedin_personal",
             "linkedin_company",
             "tiktok",
             "youtube",
@@ -44,6 +43,12 @@ class TestProviderRegistry:
     def test_get_provider_default_credentials(self):
         provider = get_provider("bluesky")
         assert provider.credentials == {}
+
+    def test_runtime_registry_rejects_personal_linkedin_with_or_without_explicit_credentials(self):
+        assert "linkedin_personal" not in PROVIDER_REGISTRY
+        for credentials in (None, {"client_id": "personal-app", "client_secret": "secret"}):
+            with pytest.raises(ValueError, match="Personal LinkedIn provider is disabled"):
+                get_provider("linkedin_personal", credentials)
 
 
 class TestSocialProviderInterface:
@@ -122,10 +127,6 @@ class TestProviderMetadata:
     def test_instagram_max_caption(self):
         p = get_provider("instagram")
         assert p.max_caption_length == 2200
-
-    def test_linkedin_personal_max_caption(self):
-        p = get_provider("linkedin_personal")
-        assert p.max_caption_length == 3000
 
     def test_linkedin_company_max_caption(self):
         p = get_provider("linkedin_company")

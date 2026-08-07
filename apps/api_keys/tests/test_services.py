@@ -114,7 +114,7 @@ def social_account(db, workspace):
 
     return SocialAccount.objects.create(
         workspace=workspace,
-        platform="linkedin_personal",
+        platform="facebook",
         account_platform_id="li-123",
         account_name="Test LinkedIn",
     )
@@ -126,7 +126,7 @@ def foreign_social_account(db, other_workspace):
 
     return SocialAccount.objects.create(
         workspace=other_workspace,
-        platform="linkedin_personal",
+        platform="facebook",
         account_platform_id="li-foreign",
         account_name="Foreign LinkedIn",
     )
@@ -327,6 +327,32 @@ class TestIssuanceGuards:
                 permissions=[],
             )
 
+    @pytest.mark.parametrize(
+        ("platform", "account_platform_id"),
+        [
+            ("linkedin_personal", "human-page-admin"),
+            ("linkedin_company", "999999999"),
+        ],
+    )
+    def test_rejects_non_operable_linkedin_identity(self, workspace, workspace_owner, platform, account_platform_id):
+        from apps.social_accounts.models import SocialAccount
+
+        account = SocialAccount.all_objects.create(
+            workspace=workspace,
+            platform=platform,
+            account_platform_id=account_platform_id,
+            account_name="Quarantined LinkedIn identity",
+        )
+
+        with pytest.raises(ValueError, match="not an operable Clarity identity"):
+            services.issue_api_key(
+                workspace=workspace,
+                social_accounts=[account],
+                issued_by=workspace_owner.user,
+                name="quarantined",
+                permissions=[],
+            )
+
     def test_rejects_user_with_no_workspace_membership(self, workspace, organization, social_account, db):
         """Org admin (so the manage_api_keys gate passes) but no workspace
         membership in the target workspace — must still fail.
@@ -515,7 +541,7 @@ class TestUpdateApiKey:
 
         other = SocialAccount.objects.create(
             workspace=workspace,
-            platform="linkedin_personal",
+            platform="facebook",
             account_platform_id="li-second",
             account_name="Second LinkedIn",
         )

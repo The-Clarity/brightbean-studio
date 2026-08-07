@@ -90,6 +90,32 @@ class TestSocialAccount:
         assert accounts.count() == 1
         assert accounts.first().account_name == "Test Page"
 
+    def test_runtime_manager_hides_every_non_operable_linkedin_identity(self, workspace):
+        historical_person = SocialAccount.all_objects.create(
+            workspace=workspace,
+            platform="linkedin_personal",
+            account_platform_id="human-page-admin",
+            account_name="Historical Human",
+        )
+        wrong_page = SocialAccount.all_objects.create(
+            workspace=workspace,
+            platform="linkedin_company",
+            account_platform_id="999999999",
+            account_name="Wrong Page",
+        )
+        clarity_page = SocialAccount.all_objects.create(
+            workspace=workspace,
+            platform="linkedin_company",
+            account_platform_id="112378013",
+            account_name="Clarity",
+        )
+
+        visible_ids = set(SocialAccount.objects.values_list("id", flat=True))
+        assert clarity_page.id in visible_ids
+        assert historical_person.id not in visible_ids
+        assert wrong_page.id not in visible_ids
+        assert SocialAccount.all_objects.filter(id__in=[historical_person.id, wrong_page.id]).count() == 2
+
     def test_is_token_expiring_soon_true(self, social_account):
         social_account.token_expires_at = timezone.now() + timedelta(days=3)
         social_account.save()

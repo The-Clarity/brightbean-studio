@@ -90,14 +90,12 @@ class TestConnectionLinkPkce:
 
 @pytest.mark.django_db
 class TestConnectionLinkClarityLinkedInPolicy:
-    @override_settings(CLARITY_LINKEDIN_PAGE_ONLY=True)
     def test_connection_page_hides_personal_linkedin(self, client, connection_link):
         response = client.get(reverse("onboarding:connection_page", kwargs={"token": connection_link.token}))
 
         assert response.status_code == 200
         assert b"LinkedIn (Personal Profile)" not in response.content
 
-    @override_settings(CLARITY_LINKEDIN_PAGE_ONLY=True)
     def test_oauth_start_rejects_personal_linkedin_server_side(self, client, connection_link):
         url = reverse("onboarding:connection_oauth_start", kwargs={"token": connection_link.token})
         with (
@@ -109,10 +107,7 @@ class TestConnectionLinkClarityLinkedInPolicy:
         assert response.status_code == 302
         get_provider.assert_not_called()
 
-    @override_settings(
-        CLARITY_LINKEDIN_PAGE_ONLY=True,
-        CLARITY_LINKEDIN_ALLOWED_ORGANIZATION_IDS=("112378013",),
-    )
+    @override_settings(CLARITY_LINKEDIN_ALLOWED_ORGANIZATION_IDS=("112378013",))
     def test_oauth_callback_connects_only_clarity_page(self, client, workspace, connection_link):
         nonce = "nonce-linkedin-company"
         state = _sign_connection_link_state(workspace.id, "linkedin_company", connection_link.token, nonce)

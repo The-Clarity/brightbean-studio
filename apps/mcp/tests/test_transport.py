@@ -110,9 +110,9 @@ def social_account(db, workspace):
 
     return SocialAccount.objects.create(
         workspace=workspace,
-        platform="linkedin_personal",
-        account_platform_id="li-mcp",
-        account_name="LinkedIn MCP",
+        platform="bluesky",
+        account_platform_id="did:plc:mcp",
+        account_name="Bluesky MCP",
         connection_status="connected",
     )
 
@@ -126,7 +126,7 @@ def second_account(db, workspace):
 
     return SocialAccount.objects.create(
         workspace=workspace,
-        platform="linkedin_personal",
+        platform="facebook",
         account_platform_id="li-mcp-second",
         account_name="LinkedIn MCP 2",
         connection_status="connected",

@@ -49,7 +49,6 @@ from apps.social_accounts.models import SocialAccount
 #: ``"facebook"``), which silently dropped every Facebook account into
 #: ``_DEFAULT_FALLBACK=50/day`` instead of the intended 200/day cap.
 PLATFORM_DAILY_POST_LIMIT: dict[str, int] = {
-    "linkedin_personal": 100,
     "linkedin_company": 100,
     "facebook": 200,
     "instagram": 25,
