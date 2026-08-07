@@ -135,16 +135,3 @@ jobs:
             -t "${REGISTRY}/${IMAGE_NAME}:latest" \
             $(printf "${REGISTRY}/${IMAGE_NAME}@sha256:%s " *)
           docker buildx imagetools inspect "${REGISTRY}/${IMAGE_NAME}:${version}"
-
-      - name: Require anonymous mirror access
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          package_name="${IMAGE_NAME##*/}"
-          curl --fail-with-body --silent --show-error \
-            --request PATCH \
-            --header "Authorization: Bearer ${GH_TOKEN}" \
-            --header "Accept: application/vnd.github+json" \
-            --header "X-GitHub-Api-Version: 2022-11-28" \
-            "https://api.github.com/orgs/${GITHUB_REPOSITORY_OWNER}/packages/container/${package_name}" \
-            --data '{"visibility":"public"}'
