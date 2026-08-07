@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from django.core import signing
+from django.test import override_settings
 from django.urls import reverse
 
 from apps.social_accounts.models import SocialAccount
@@ -94,6 +95,28 @@ class TestConnectPlatformView:
         assert response.status_code == 200
         assert b"Connect a Platform" in response.content
 
+    @override_settings(CLARITY_LINKEDIN_PAGE_ONLY=True)
+    def test_page_only_mode_hides_personal_linkedin(self, authenticated_client, workspace):
+        url = reverse("social_accounts:connect", kwargs={"workspace_id": workspace.id})
+        response = authenticated_client.get(url)
+
+        assert response.status_code == 200
+        assert b"LinkedIn (Company Page)" in response.content
+        assert b"LinkedIn (Personal Profile)" not in response.content
+
+    @override_settings(CLARITY_LINKEDIN_PAGE_ONLY=True)
+    def test_page_only_mode_rejects_personal_linkedin_server_side(self, authenticated_client, workspace):
+        url = reverse("social_accounts:connect", kwargs={"workspace_id": workspace.id})
+
+        with (
+            patch("apps.social_accounts.views._get_configured_platforms", return_value={"linkedin_personal"}),
+            patch("apps.social_accounts.views._get_provider_for_platform") as get_provider,
+        ):
+            response = authenticated_client.post(url, {"platform": "linkedin_personal"})
+
+        assert response.status_code == 302
+        get_provider.assert_not_called()
+
     def test_post_invalid_platform(self, authenticated_client, workspace):
         url = reverse("social_accounts:connect", kwargs={"workspace_id": workspace.id})
         response = authenticated_client.post(url, {"platform": "twitter"})
@@ -168,6 +191,25 @@ class TestConnectPlatformView:
 
 @pytest.mark.django_db
 class TestReconnectView:
+    @override_settings(CLARITY_LINKEDIN_PAGE_ONLY=True)
+    def test_page_only_mode_blocks_legacy_personal_reconnect(self, authenticated_client, workspace):
+        account = SocialAccount.objects.create(
+            workspace=workspace,
+            platform="linkedin_personal",
+            account_platform_id="legacy-person",
+            account_name="Historical LinkedIn profile",
+        )
+        url = reverse(
+            "social_accounts:reconnect",
+            kwargs={"workspace_id": workspace.id, "account_id": account.id},
+        )
+
+        with patch("apps.social_accounts.views._get_provider_for_platform") as get_provider:
+            response = authenticated_client.post(url)
+
+        assert response.status_code == 302
+        get_provider.assert_not_called()
+
     def test_pkce_reconnect_generates_and_forwards_verifier(self, authenticated_client, workspace):
         """Reconnecting a TikTok account must regenerate + forward a PKCE verifier;
         reconnect previously sent no code_challenge -> TikTok errCode 10007."""
@@ -241,6 +283,33 @@ class TestOAuthCallbackView:
         page_data = authenticated_client.session["oauth_page_select"]
         assert page_data["platform"] == "instagram"
         assert page_data["pages"][0]["id"] == "17841400000000000"
+
+    @override_settings(
+        CLARITY_LINKEDIN_PAGE_ONLY=True,
+        CLARITY_LINKEDIN_ALLOWED_ORGANIZATION_IDS=("112378013",),
+    )
+    def test_linkedin_company_callback_keeps_only_clarity_page(self, authenticated_client, workspace, user):
+        nonce = "nonce-linkedin-company"
+        state = _sign_state(workspace.id, "linkedin_company", user.id, nonce)
+        session = authenticated_client.session
+        session[OAUTH_SESSION_KEY] = {"nonce": nonce}
+        session.save()
+
+        mock_provider = MagicMock()
+        mock_provider.exchange_code.return_value = OAuthTokens(access_token="page-token", refresh_token="refresh")
+        mock_provider.get_user_pages.return_value = [
+            {"id": "999", "name": "Another Page", "access_token": "page-token"},
+            {"id": "112378013", "name": "Clarity", "access_token": "page-token"},
+        ]
+        url = reverse("social_accounts:oauth_callback", kwargs={"platform": "linkedin_company"})
+
+        with patch("apps.social_accounts.views._get_provider_for_platform", return_value=mock_provider):
+            response = authenticated_client.get(url, {"code": "abc123", "state": state})
+
+        assert response.status_code == 302
+        assert response.url == reverse("social_accounts:select_account")
+        page_data = authenticated_client.session["oauth_page_select"]
+        assert [page["id"] for page in page_data["pages"]] == ["112378013"]
 
     def test_tiktok_callback_replays_pkce_verifier(self, authenticated_client, workspace, user):
         """The verifier stashed at connect is read from the session and replayed

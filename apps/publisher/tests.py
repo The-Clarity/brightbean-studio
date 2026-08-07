@@ -3,7 +3,7 @@
 from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
-from django.test import SimpleTestCase, TestCase
+from django.test import SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
 
 from apps.publisher.engine import MAX_RETRIES, RETRY_BACKOFF, PublishEngine, _resolve_publish_credentials
@@ -194,6 +194,39 @@ class DispatchExtraInjectionTest(SimpleTestCase):
 
         _access_token, content = mock_provider.publish_post.call_args.args
         self.assertNotIn("author", content.extra)
+
+    @override_settings(CLARITY_LINKEDIN_PAGE_ONLY=True)
+    @patch("apps.publisher.engine.get_provider")
+    @patch("apps.publisher.engine._resolve_publish_credentials", return_value={})
+    def test_page_only_mode_permanently_rejects_personal_linkedin(self, _mock_creds, mock_get_provider):
+        engine, platform_post, _mock_provider = _build_dispatch_mocks(
+            platform="linkedin_personal",
+            account_platform_id="legacy-person",
+        )
+
+        with self.assertRaisesRegex(Exception, "Personal LinkedIn publishing is disabled") as caught:
+            engine._dispatch_to_provider(platform_post)
+
+        self.assertFalse(caught.exception.retryable)
+        mock_get_provider.assert_not_called()
+
+    @override_settings(
+        CLARITY_LINKEDIN_PAGE_ONLY=True,
+        CLARITY_LINKEDIN_ALLOWED_ORGANIZATION_IDS=("112378013",),
+    )
+    @patch("apps.publisher.engine.get_provider")
+    @patch("apps.publisher.engine._resolve_publish_credentials", return_value={})
+    def test_page_only_mode_permanently_rejects_non_clarity_page(self, _mock_creds, mock_get_provider):
+        engine, platform_post, _mock_provider = _build_dispatch_mocks(
+            platform="linkedin_company",
+            account_platform_id="999",
+        )
+
+        with self.assertRaisesRegex(Exception, "not an approved Clarity identity") as caught:
+            engine._dispatch_to_provider(platform_post)
+
+        self.assertFalse(caught.exception.retryable)
+        mock_get_provider.assert_not_called()
 
 
 class ResolvePublishCredentialsTest(SimpleTestCase):

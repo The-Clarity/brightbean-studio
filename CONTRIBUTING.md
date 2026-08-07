@@ -25,7 +25,7 @@ From then on, the hooks run automatically. To run them against every file in the
 pre-commit run --all-files
 ```
 
-The hooks enforce the same rules as CI, so passing them locally means your PR will pass the automated checks.
+The hooks enforce the same checks as the Argo quality gate.
 
 ## Development Workflow
 
@@ -70,7 +70,7 @@ ruff check --fix .
 ruff format .
 ```
 
-CI runs all of these checks automatically on every PR, plus a [gitleaks](https://github.com/gitleaks/gitleaks) secret scan. Never commit real API keys, tokens, or passwords. Put them in your local `.env` (which is gitignored) and reference them by name in `.env.example`.
+Argo runs all of these checks for accepted pushes, plus secret and image scans. Never commit real API keys, tokens, or passwords. Put them in your local `.env` (which is gitignored) and reference them by name in `.env.example`.
 
 ## Submitting Changes
 

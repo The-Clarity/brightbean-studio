@@ -24,10 +24,9 @@ class LinkedInCompanyProvider(LinkedInProvider):
     def required_scopes(self) -> list[str]:
         return [
             "r_basicprofile",
-            "w_member_social",
+            "rw_organization_admin",
             "w_organization_social",
             "r_organization_social",
-            "rw_organization_admin",
         ]
 
     def get_user_pages(self, access_token: str) -> list[dict]:

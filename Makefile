@@ -7,7 +7,7 @@ help: ## Show this help
 
 setup: ## Initial project setup (copy env, install deps, migrate)
 	@test -f .env || cp .env.example .env
-	pip install -r requirements.txt
+	pip install --require-hashes -r requirements-dev.lock
 	cd theme/static_src && npm install
 	python manage.py migrate
 	@echo ""

@@ -21,8 +21,15 @@ services:
       migrate:
         condition: service_completed_successfully
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   worker:
+    command: python manage.py process_tasks_with_heartbeat
     volumes:
       - media_data:/app/media
     environment:
@@ -31,8 +38,17 @@ services:
       migrate:
         condition: service_completed_successfully
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "manage.py", "worker_healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
   postgres:
+    restart: unless-stopped
+
+  redis:
     restart: unless-stopped
 
   caddy:

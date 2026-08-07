@@ -27,6 +27,11 @@ from apps.members.decorators import require_permission
 from apps.members.models import WorkspaceMembership
 from apps.notifications.engine import notify
 from apps.notifications.models import EventType
+from apps.social_accounts.identity_policy import (
+    filter_linkedin_pages,
+    filter_platform_choices,
+    platform_is_connectable,
+)
 from apps.social_accounts.oauth_aliases import from_url_slug, redirect_uri_from_request, to_url_slug
 from apps.social_accounts.oauth_pkce import issue_pkce_verifier, pkce_kwargs
 from apps.social_accounts.views import (
@@ -269,7 +274,7 @@ def connection_page(request, token):
             "workspace": workspace,
             "error": session_error,
             "org": org,
-            "platform_choices": PlatformCredential.Platform.choices,
+            "platform_choices": filter_platform_choices(PlatformCredential.Platform.choices),
             "configured_platforms": configured_platforms,
             "connected_accounts": connected_accounts,
         },
@@ -292,7 +297,7 @@ def connection_oauth_start(request, token):
         return redirect("onboarding:connection_page", token=token)
 
     platform = request.POST.get("platform", "").strip()
-    if platform not in dict(PlatformCredential.Platform.choices):
+    if platform not in dict(filter_platform_choices(PlatformCredential.Platform.choices)):
         return redirect("onboarding:connection_page", token=token)
 
     org = link.workspace.organization
@@ -396,6 +401,13 @@ def connection_oauth_callback(request, platform):
             {"error": "Platform mismatch in OAuth callback."},
         )
 
+    if not platform_is_connectable(platform):
+        return render(
+            request,
+            "onboarding/connection_expired.html",
+            {"error": "Personal LinkedIn connections are disabled; use the approved Clarity Page."},
+        )
+
     # Look up connection link
     token = state_data.get("connection_link_token")
     link = _get_connection_link_or_none(token)
@@ -413,14 +425,15 @@ def connection_oauth_callback(request, platform):
         provider = _get_provider_for_platform(platform, org.id, **extra_creds)
         redirect_uri = redirect_uri_from_request(request)
         tokens = provider.exchange_code(code, redirect_uri, **pkce_kwargs(session_data.get("code_verifier")))
-        profile = provider.get_profile(tokens.access_token)
-
-        # Handle Facebook/Instagram multi-page: auto-connect first page
+        # Page providers return the exact identities that can be connected.
         if platform in (
             PlatformCredential.Platform.FACEBOOK,
             PlatformCredential.Platform.INSTAGRAM,
+            PlatformCredential.Platform.LINKEDIN_COMPANY,
         ) and hasattr(provider, "get_user_pages"):
             pages = provider.get_user_pages(tokens.access_token)
+            if platform == PlatformCredential.Platform.LINKEDIN_COMPANY:
+                pages = filter_linkedin_pages(pages)
             if pages:
                 from providers.types import AccountProfile
 
@@ -449,7 +462,14 @@ def connection_oauth_callback(request, platform):
                     )
                 return redirect("onboarding:connection_page", token=token)
 
+            if platform == PlatformCredential.Platform.LINKEDIN_COMPANY:
+                request.session["connection_link_error"] = (
+                    "The approved Clarity LinkedIn Page was not available for this account."
+                )
+                return redirect("onboarding:connection_page", token=token)
+
         # Standard single-account flow
+        profile = provider.get_profile(tokens.access_token)
         account = _create_or_update_account(
             workspace_id=workspace_id,
             platform=platform,

@@ -11,6 +11,15 @@ def _make_response(payload: dict) -> MagicMock:
     return resp
 
 
+def test_page_app_requests_only_community_management_scopes():
+    assert LinkedInCompanyProvider().required_scopes == [
+        "r_basicprofile",
+        "rw_organization_admin",
+        "w_organization_social",
+        "r_organization_social",
+    ]
+
+
 class TestGetUserPages:
     @patch.object(LinkedInCompanyProvider, "_request")
     def test_resolves_logo_url_from_projection(self, mock_request):

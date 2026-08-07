@@ -1,37 +1,70 @@
 services:
   migrate:
-    build: .
+    build:
+      context: .
+      target: production
     command: python manage.py migrate --noinput
     env_file:
       - .env
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/brightbean
+      REDIS_URL: redis://redis:6379/0
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
 
   app:
-    build: .
+    build:
+      context: .
+      target: production
     volumes:
       - media_data:/app/media
     ports:
       - "8000:8000"
     env_file:
       - .env
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/brightbean
+      REDIS_URL: redis://redis:6379/0
     depends_on:
       migrate:
         condition: service_completed_successfully
+      redis:
+        condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   worker:
-    build: .
-    command: python manage.py process_tasks
+    build:
+      context: .
+      target: production
+    command: python manage.py process_tasks_with_heartbeat
     volumes:
       - media_data:/app/media
     env_file:
       - .env
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/brightbean
+      REDIS_URL: redis://redis:6379/0
     depends_on:
       migrate:
         condition: service_completed_successfully
+      redis:
+        condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "manage.py", "worker_healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
   postgres:
     image: postgres:16-alpine
@@ -49,6 +82,18 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
 volumes:
   postgres_data:
+  redis_data:
   media_data:

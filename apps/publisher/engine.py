@@ -29,7 +29,9 @@ from django.utils import timezone
 
 from apps.composer.models import PlatformPost
 from apps.credentials.models import resolve_platform_credentials
+from apps.social_accounts.identity_policy import linkedin_publish_block_reason
 from providers import get_provider
+from providers.exceptions import PublishError
 from providers.types import PostType, PublishContent
 
 from .models import PublishLog, RateLimitState
@@ -317,6 +319,9 @@ class PublishEngine:
         """
         account = platform_post.social_account
         platform = account.platform
+
+        if reason := linkedin_publish_block_reason(platform, account.account_platform_id):
+            raise PublishError(reason, platform="LinkedIn", retryable=False)
 
         credentials = _resolve_publish_credentials(account)
         provider = get_provider(platform, credentials)
@@ -635,6 +640,9 @@ def _post_first_comment_task(platform_post_id):
         return
 
     account = platform_post.social_account
+    if reason := linkedin_publish_block_reason(account.platform, account.account_platform_id):
+        logger.warning("Skipped first comment for disallowed identity: %s", reason)
+        return
     try:
         credentials = _resolve_publish_credentials(account)
         provider = get_provider(account.platform, credentials)

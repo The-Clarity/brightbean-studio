@@ -385,6 +385,13 @@ _INSTAGRAM_LOGIN_CREDENTIALS = {
 _LINKEDIN_LEGACY_CLIENT_ID = env("PLATFORM_LINKEDIN_CLIENT_ID", default="")
 _LINKEDIN_LEGACY_CLIENT_SECRET = env("PLATFORM_LINKEDIN_CLIENT_SECRET", default="")
 
+# Clarity deployments keep historical personal-profile rows readable, but
+# expose and publish only explicitly approved organization identities.
+CLARITY_LINKEDIN_PAGE_ONLY = env.bool("CLARITY_LINKEDIN_PAGE_ONLY", default=False)
+CLARITY_LINKEDIN_ALLOWED_ORGANIZATION_IDS = tuple(
+    value.strip() for value in env.list("CLARITY_LINKEDIN_ALLOWED_ORGANIZATION_IDS", default=[]) if value.strip()
+)
+
 # LinkedIn Company always uses Community Management API scopes (the only path that
 # works for Company Pages). Falls back to legacy shared creds for backward compat.
 _LINKEDIN_COMPANY_CREDENTIALS = {
@@ -485,6 +492,18 @@ OAUTH2_PROVIDER = {
     "SCOPES": {"mcp": "Call BrightBean Studio MCP tools on your behalf"},
     "DEFAULT_SCOPES": ["mcp"],
     "PKCE_REQUIRED": True,
+    "COMPLIANT_BCP_RFC9700_IMPLICIT_GRANT": True,
+    "COMPLIANT_BCP_RFC9700_PASSWORD_GRANT": True,
+    "COMPLIANT_BCP_RFC9700_PKCE_METHOD": True,
+    "COMPLIANT_BCP_RFC9700_ACCESS_TOKEN_TRANSPORT": True,
+    "COMPLIANT_BCP_RFC9700_AUTHZ_RESPONSE_ISS": True,
+    "COMPLIANT_BCP_RFC9700_TOKEN_STORAGE": True,
+    "COMPLIANT_BCP_RFC9700_REFRESH_TOKEN": True,
+    "COMPLIANT_BCP_RFC9700_REDIRECT_URI_SCHEME": True,
+    "COMPLIANT_BCP_RFC9700_REDIRECT_URI_MATCHING": True,
+    "COMPLIANT_BCP_RFC9700_PKCE_REQUIRED": True,
+    "REFRESH_TOKEN_REUSE_PROTECTION": True,
+    "ALLOW_URI_WILDCARDS": False,
     # Restrict ``code_challenge_method`` to ``S256``. django-oauth-toolkit
     # (and oauthlib under it) accept ``plain`` by default — RFC 7636 §4.2
     # marks ``plain`` as insecure. ``S256OnlyOAuth2Validator`` rejects any

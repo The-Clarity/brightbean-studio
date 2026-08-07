@@ -138,17 +138,21 @@ def sidebar_context(request):
 
 def _platform_display_names():
     """Return list of (platform_key, display_name) tuples."""
-    return [
-        ("instagram", "Instagram"),
-        ("facebook", "Facebook"),
-        ("linkedin_personal", "LinkedIn (Personal)"),
-        ("linkedin_company", "LinkedIn (Company)"),
-        ("tiktok", "TikTok"),
-        ("youtube", "YouTube"),
-        ("pinterest", "Pinterest"),
-        ("threads", "Threads"),
-        ("bluesky", "Bluesky"),
-        ("mastodon", "Mastodon"),
-        ("twitter", "X (Twitter)"),
-        ("google_business", "Google Business"),
-    ]
+    from apps.social_accounts.identity_policy import filter_platform_choices
+
+    return filter_platform_choices(
+        [
+            ("instagram", "Instagram"),
+            ("facebook", "Facebook"),
+            ("linkedin_personal", "LinkedIn (Personal)"),
+            ("linkedin_company", "LinkedIn (Company)"),
+            ("tiktok", "TikTok"),
+            ("youtube", "YouTube"),
+            ("pinterest", "Pinterest"),
+            ("threads", "Threads"),
+            ("bluesky", "Bluesky"),
+            ("mastodon", "Mastodon"),
+            ("twitter", "X (Twitter)"),
+            ("google_business", "Google Business"),
+        ]
+    )

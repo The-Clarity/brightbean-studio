@@ -9,7 +9,6 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/brightbeanxyz/brightbean-studio/actions/workflows/ci.yml"><img src="https://github.com/brightbeanxyz/brightbean-studio/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-AGPL--3.0-blue.svg" alt="License: AGPL-3.0"></a>
   <a href="https://www.python.org/"><img src="https://img.shields.io/badge/Python-3.12%2B-blue.svg" alt="Python 3.12+"></a>
   <a href="https://www.djangoproject.com/"><img src="https://img.shields.io/badge/Django-5.x-green.svg" alt="Django 5.x"></a>
@@ -102,6 +101,7 @@ After deploying, set these environment variables in your platform's dashboard:
 | `SECRET_KEY` | Auto-generated | Django secret key. Set automatically by the deploy button. |
 | `ENCRYPTION_KEY_SALT` | Auto-generated | Encryption salt. Set automatically by the deploy button. |
 | `DATABASE_URL` | Auto-provisioned | PostgreSQL connection string. Set automatically. |
+| `REDIS_URL` | Yes | Shared Redis connection used for cache, readiness, rate limits, and worker heartbeats. |
 | `ALLOWED_HOSTS` | Yes | Your app's domain, e.g. `your-app.herokuapp.com` |
 | `APP_URL` | Yes | Full public URL, e.g. `https://your-app.herokuapp.com` |
 | `STORAGE_BACKEND` | No | Set to `s3` for S3/R2 storage. Default: `local`. Heroku, Render, and Railway have ephemeral filesystems, so uploaded files are lost on redeploy without S3. |
@@ -131,6 +131,7 @@ Edit `.env` - change `DATABASE_URL` to point to the Docker service name:
 
 ```
 DATABASE_URL=postgres://postgres:postgres@postgres:5432/brightbean
+REDIS_URL=redis://redis:6379/0
 ```
 
 Then start everything:
@@ -142,6 +143,9 @@ docker compose exec app python manage.py createsuperuser
 
 Database migrations run automatically via the `migrate` Compose service before
 the `app` and `worker` services start, so there is no separate migrate step.
+For Kubernetes or another orchestrator, run `python manage.py migrate --noinput`
+as a one-shot deployment job before starting the web and
+`python manage.py process_tasks_with_heartbeat` worker commands.
 
 Tailwind compiles automatically via the `tailwind` Compose service. First build
 takes ~60–90 seconds (running `npm install` in a fresh container); subsequent
@@ -152,12 +156,15 @@ Open http://localhost:8000 - you're running.
 
 ## Fully Local Development (without Docker)
 
-Run everything natively - no Docker, no PostgreSQL install. Uses SQLite for the database.
+Run everything natively without Docker. SQLite replaces PostgreSQL; Redis is
+still required for the same shared-cache and worker-readiness contract used in
+production.
 
 ### Prerequisites
 
 - Python 3.12+
 - Node.js 20+
+- Redis 7+
 
 ### Setup
 
@@ -175,16 +182,17 @@ Open `.env` and replace the `DATABASE_URL` line:
 
 ```
 DATABASE_URL=sqlite:///db.sqlite3
+REDIS_URL=redis://localhost:6379/0
 ```
 
-That's it - no database server to install or manage.
+Start your local Redis service before starting Django or the worker.
 
 **3. Set up Python**
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install --require-hashes -r requirements-dev.lock
 ```
 
 **4. Set up Tailwind CSS**
@@ -223,7 +231,7 @@ python manage.py runserver
 Tab 3 - Background worker:
 ```bash
 source .venv/bin/activate
-python manage.py process_tasks
+python manage.py process_tasks_with_heartbeat
 ```
 
 Open http://localhost:8000 and log in with the superuser you created.
@@ -286,7 +294,7 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 docker compose exec app python manage.py createsuperuser
 ```
 
-This starts 5 containers: app (Gunicorn), worker, PostgreSQL, Caddy (auto-HTTPS), and a one-shot migrate container that runs database migrations automatically on startup. Edit the `Caddyfile` with your domain.
+This starts the app (Gunicorn), worker, PostgreSQL, Redis, Caddy (auto-HTTPS), and a one-shot migrate container that runs database migrations automatically on startup. Edit the `Caddyfile` with your domain.
 
 To update:
 

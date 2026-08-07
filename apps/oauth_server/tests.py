@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 
 import pytest
+from django.core.checks import run_checks
 from django.test import Client
 
 REGISTER_URL = "/oauth/register"
@@ -16,6 +17,14 @@ AS_META_URL = "/.well-known/oauth-authorization-server"
 PR_META_URL = "/.well-known/oauth-protected-resource"
 PR_META_MCP_URL = "/.well-known/oauth-protected-resource/api/v1/mcp"
 CLAUDE_REDIRECT = "https://claude.ai/api/mcp/auth_callback"
+
+
+def test_oauth_provider_has_no_deployment_security_findings():
+    finding_ids = {
+        issue.id for issue in run_checks(include_deployment_checks=True) if issue.id.startswith("oauth2_provider.")
+    }
+
+    assert finding_ids == set()
 
 
 @pytest.fixture(autouse=True)

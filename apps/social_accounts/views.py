@@ -25,6 +25,7 @@ from apps.common.validators import is_safe_url as _is_safe_url
 from apps.credentials.models import PlatformCredential, resolve_platform_credentials
 from apps.members.decorators import require_permission
 
+from .identity_policy import filter_linkedin_pages, filter_platform_choices, platform_is_connectable
 from .models import MastodonAppRegistration, PlatformVisibility, SocialAccount
 from .oauth_aliases import from_url_slug, redirect_uri_from_request, to_url_slug
 from .oauth_pkce import issue_pkce_verifier, pkce_kwargs
@@ -54,7 +55,8 @@ def _get_visible_platform_choices():
     Platforms without a PlatformVisibility row default to visible.
     """
     hidden = set(PlatformVisibility.objects.filter(is_visible=False).values_list("platform", flat=True))
-    return [(value, label) for value, label in PlatformCredential.Platform.choices if value not in hidden]
+    visible = [(value, label) for value, label in PlatformCredential.Platform.choices if value not in hidden]
+    return filter_platform_choices(visible)
 
 
 def _apply_analytics_scope_flag(provider, platform):
@@ -95,7 +97,7 @@ def _get_configured_platforms(org_id):
         if provider_cls().auth_type in (AuthType.SESSION, AuthType.INSTANCE_OAUTH):
             configured.add(platform)
 
-    return configured
+    return {platform for platform in configured if platform_is_connectable(platform)}
 
 
 def _build_redirect_uri(request, platform):
@@ -209,7 +211,7 @@ def account_list(request, workspace_id):
             "accounts": accounts,
             "workspace_id": workspace_id,
             "configured_platforms": configured_platforms,
-            "platform_choices": PlatformCredential.Platform.choices,
+            "platform_choices": _get_visible_platform_choices(),
             "settings_active": "social_accounts",
         },
     )
@@ -366,6 +368,8 @@ def oauth_callback(request, platform):
             PlatformCredential.Platform.LINKEDIN_COMPANY,
         ) and hasattr(provider, "get_user_pages"):
             pages = provider.get_user_pages(tokens.access_token)
+            if platform == PlatformCredential.Platform.LINKEDIN_COMPANY:
+                pages = filter_linkedin_pages(pages)
             if pages:
                 # Store in session for account selection
                 request.session["oauth_page_select"] = {
@@ -381,12 +385,8 @@ def oauth_callback(request, platform):
             else:
                 if platform == PlatformCredential.Platform.LINKEDIN_COMPANY:
                     warning = (
-                        "No LinkedIn Company Pages were found for your account. "
-                        "Only Company Pages you administer can be connected — "
-                        "personal profiles connect via the LinkedIn (Personal) option. "
-                        "If you expected to see a Page, ask the page owner to grant "
-                        "you Admin access in LinkedIn \u2192 Admin tools \u2192 "
-                        "Manage admins, then reconnect."
+                        "The approved Clarity LinkedIn Page was not available for this account. "
+                        "Confirm that you administer the Clarity Page, then reconnect."
                     )
                 else:
                     if platform == PlatformCredential.Platform.INSTAGRAM:
@@ -447,14 +447,18 @@ def select_account(request):
         return redirect("dashboard")
 
     workspace_id = page_data["workspace_id"]
+    platform = page_data["platform"]
+    pages = page_data["pages"]
+    if platform == PlatformCredential.Platform.LINKEDIN_COMPANY:
+        pages = filter_linkedin_pages(pages)
 
     if request.method == "GET":
         return render(
             request,
             "social_accounts/account_select.html",
             {
-                "pages": page_data["pages"],
-                "platform": page_data["platform"],
+                "pages": pages,
+                "platform": platform,
                 "workspace_id": workspace_id,
             },
         )
@@ -467,19 +471,18 @@ def select_account(request):
             request,
             "social_accounts/account_select.html",
             {
-                "pages": page_data["pages"],
-                "platform": page_data["platform"],
+                "pages": pages,
+                "platform": platform,
                 "workspace_id": workspace_id,
             },
         )
 
     from providers.types import AccountProfile
 
-    platform = page_data["platform"]
     user_tokens = page_data["user_tokens"]
     connected = []
 
-    for page in page_data["pages"]:
+    for page in pages:
         if page["id"] in selected_ids:
             access_token = page.get("access_token")
             if not access_token and platform == "instagram":
@@ -731,6 +734,10 @@ def reconnect(request, workspace_id, account_id):
     """Re-initiate OAuth for an existing account."""
     account = get_object_or_404(SocialAccount.objects.for_workspace(workspace_id), id=account_id)
     platform = account.platform
+
+    if not platform_is_connectable(platform):
+        messages.error(request, "Personal LinkedIn connections are disabled; use the approved Clarity Page.")
+        return redirect("social_accounts:list", workspace_id=workspace_id)
 
     if platform == PlatformCredential.Platform.BLUESKY:
         return redirect("social_accounts:connect_bluesky", workspace_id=workspace_id)

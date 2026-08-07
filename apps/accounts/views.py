@@ -7,9 +7,14 @@ from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 from PIL import Image
 
+from apps.common.health import required_services_available
+
 
 def health_check(request):
-    """Health check endpoint at /health/."""
+    """Report readiness without disclosing which dependency is unavailable."""
+    if not required_services_available():
+        return JsonResponse({"status": "unavailable"}, status=503)
+
     return JsonResponse({"status": "ok"})
 
 

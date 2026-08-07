@@ -217,7 +217,7 @@ Production Docker Compose on a single VPS.
 | Monitoring | Sentry + UptimeRobot free tiers | €0 |
 | **Total** | | **~€10/month** |
 
-Automated deploy: GitHub Actions → SSH → pull + restart. Backups: daily `pg_dump` to R2.
+Automated deploy: HMAC push webhook → Argo Workflows quality/build gate → private registry → Argo CD/Rollouts. Backups: daily `pg_dump` to private object storage.
 
 **Scaling path:**
 
@@ -551,7 +551,7 @@ python manage.py process_tasks       # terminal 2
 
 Or: `docker compose up` (Tailwind builds inside Dockerfile).
 
-**CI (GitHub Actions):** lint (ruff) → type check (mypy) → tests (pytest) → E2E (Playwright) → build image → deploy on merge to main.
+**CI (Argo Workflows):** lint (ruff) → type check (mypy) → tests (pytest) → build and scan the private image → Argo CD/Rollouts deploy after a main push.
 
 ---
 
